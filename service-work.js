@@ -1,5 +1,5 @@
 // service-work.js (offline + installierbar)
-const CACHE_NAME = "berichtsheft-cache-v1";
+const CACHE_NAME = "berichtsheft-cache-v2";
 
 const ASSETS = [
   "./",

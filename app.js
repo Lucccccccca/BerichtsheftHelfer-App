@@ -260,7 +260,7 @@ async function syncDownAll() {
 
   setData(KEY.schoolEntries, schoolEntries);
   setData(KEY.workEntries, workEntries);
-  saveDayToDB(state.selectedDate);
+  
 
   // UI neu rendern
   renderAll();
@@ -480,6 +480,8 @@ function renderSchool() {
       a[state.selectedDate] = a[state.selectedDate] || {};
       a[state.selectedDate][s] = e.target.value;
       setData(KEY.schoolEntries, a);
+      saveDayToDB(state.selectedDate);
+
       renderDaySummary();
       renderSchoolPill();
     };
@@ -807,6 +809,7 @@ function renderSettingsSubjects() {
     c.innerHTML = `${esc(s)} <span class="x">✕</span>`;
     c.onclick = () => {
       setData(KEY.subjects, getData(KEY.subjects, []).filter((x) => x !== s));
+      saveConfigToDB();
       renderSettings();
       renderSchool();
     };
@@ -886,6 +889,8 @@ function renderSettingsTaskList(cat) {
       x[cat] = (x[cat] || []).filter((z) => z !== task);
       setData(KEY.workTemplates, x);
       renderSettingsTaskList(cat);
+      saveConfigToDB();
+
       renderWork();
     };
     list.appendChild(r);
@@ -905,6 +910,8 @@ function bindSetup() {
     const s = getData(KEY.subjects, []);
     if (!s.includes(v)) s.push(v);
     setData(KEY.subjects, s);
+    saveConfigToDB();
+
     if (input) input.value = "";
 
     renderSetupSubjects();
@@ -931,6 +938,7 @@ function bindSetup() {
     const t = getData(KEY.workTemplates, {});
     if (!t[v]) t[v] = [];
     setData(KEY.workTemplates, t);
+    saveConfigToDB();
     if (input) input.value = "";
 
     renderSetupTemplates();
@@ -948,6 +956,7 @@ function bindSetup() {
     if (!t[cat]) t[cat] = [];
     if (!t[cat].includes(v)) t[cat].push(v);
     setData(KEY.workTemplates, t);
+    saveConfigToDB();
     if (input) input.value = "";
 
     renderSetupTemplatesTaskList(cat);
@@ -1008,6 +1017,8 @@ function renderSetupSchoolDays() {
       const i = x.indexOf(w.id);
       (i >= 0) ? x.splice(i, 1) : x.push(w.id);
       setData(KEY.schoolDays, x);
+      saveConfigToDB();
+
       renderSetupSchoolDays();
     };
     g.appendChild(b);

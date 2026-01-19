@@ -1,15 +1,16 @@
 /* =========================================================
    app.js — FULL VERSION (basic, stabil, Dark/Light)
    PASST zu index.html mit:
-   - setup-screen / app-screen
+   - login-screen / setup-screen / app-screen
    - tabs: day, school, work, report, settings
-   - report-draft-school + report-draft-work (KEIN copy-draft / KEIN report-draft)
+   - report-draft-school + report-draft-work
 ========================================================= */
-    // =========================
+
+// =========================
 // SUPABASE CONFIG
 // =========================
 const SUPABASE_URL = "https://epeqhchtatxgninetvid.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwZXFoY2h0YXR4Z25pbmV0dmlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTIyNTIsImV4cCI6MjA4NDQyODI1Mn0.5yNc888ypwrAcUGvSZM8CfssRMbcovBFyltkSx6fErA";
+const SUPABASE_ANON_KEY = "PASTE_YOUR_ANON_KEY_HERE";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
@@ -137,10 +138,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       showLogin();
     } else {
       hideLogin();
-      // App anzeigen
       if (!getData(KEY.setupDone, false)) showSetup();
       else { showApp(); switchTab("day"); renderAll(); }
-      // Daten aus DB ziehen
       syncDownAll().catch(console.error);
     }
   });
@@ -158,9 +157,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   await syncDownAll();
 });
 
-
-
-    function bindAuth() {
+/* =========================
+   AUTH
+========================= */
+function bindAuth() {
   const loginBtn = $("login-btn");
   const signupBtn = $("signup-btn");
   const msg = $("login-msg");
@@ -168,22 +168,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (loginBtn) loginBtn.onclick = async () => {
     const email = ($("login-email")?.value || "").trim();
     const pass = ($("login-pass")?.value || "").trim();
-    if (!email || !pass) { if(msg) msg.textContent="Bitte E-Mail + Passwort eingeben."; return; }
+    if (!email || !pass) { if (msg) msg.textContent = "Bitte E-Mail + Passwort eingeben."; return; }
 
     if (msg) msg.textContent = "Login...";
     const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
-    if (error) { if(msg) msg.textContent = "Fehler: " + error.message; }
+    if (error) { if (msg) msg.textContent = "Fehler: " + error.message; }
   };
 
   if (signupBtn) signupBtn.onclick = async () => {
     const email = ($("login-email")?.value || "").trim();
     const pass = ($("login-pass")?.value || "").trim();
-    if (!email || !pass) { if(msg) msg.textContent="Bitte E-Mail + Passwort eingeben."; return; }
+    if (!email || !pass) { if (msg) msg.textContent = "Bitte E-Mail + Passwort eingeben."; return; }
 
     if (msg) msg.textContent = "Registrierung...";
     const { error } = await supabase.auth.signUp({ email, password: pass });
-    if (error) { if(msg) msg.textContent = "Fehler: " + error.message; }
-    else { if(msg) msg.textContent = "Account erstellt. Du kannst dich jetzt einloggen."; }
+    if (error) { if (msg) msg.textContent = "Fehler: " + error.message; }
+    else { if (msg) msg.textContent = "Account erstellt. Du kannst dich jetzt einloggen."; }
   };
 }
 
@@ -200,7 +200,6 @@ async function ensureUserConfigRow() {
   if (error) throw error;
 
   if (!data) {
-    // initial config aus localStorage übernehmen
     const payload = {
       user_id,
       dark_mode: getData(KEY.darkMode, true),
@@ -237,9 +236,9 @@ async function syncDownAll() {
   setData(KEY.workTemplates, cfg.work_templates || {});
   applyDark();
 
-  // 2) Einträge (nur letzte 90 Tage als Start – reicht erstmal)
+  // 2) Einträge (letzte 90 Tage)
   const from = new Date(); from.setDate(from.getDate() - 90);
-  const fromISO = from.toISOString().slice(0,10);
+  const fromISO = from.toISOString().slice(0, 10);
 
   const entRes = await supabase
     .from("day_entries")
@@ -253,16 +252,14 @@ async function syncDownAll() {
   const workEntries = getData(KEY.workEntries, {});
 
   for (const row of (entRes.data || [])) {
-    const day = row.day; // YYYY-MM-DD
+    const day = row.day;
     if (row.school) schoolEntries[day] = row.school;
     if (row.work) workEntries[day] = row.work;
   }
 
   setData(KEY.schoolEntries, schoolEntries);
   setData(KEY.workEntries, workEntries);
-  
 
-  // UI neu rendern
   renderAll();
   renderSchool();
   renderWork();
@@ -305,8 +302,6 @@ async function saveDayToDB(dayISO) {
   if (res.error) console.error(res.error);
 }
 
-
-
 /* =========================
    SCREEN SWITCH
 ========================= */
@@ -326,17 +321,14 @@ function showApp() {
    TABS
 ========================= */
 function switchTab(name) {
-  // activate bottom buttons
   document.querySelectorAll(".tabbtn").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
 
-  // show/hide tab contents
   ["day", "school", "work", "report", "settings"].forEach((t) => {
     const el = $("tab-" + t);
     if (!el) return;
     (t === name) ? show(el) : hide(el);
   });
 
-  // topbar title (optional)
   setText("topbar-title", {
     day: "Tag",
     school: "Schule",
@@ -345,7 +337,6 @@ function switchTab(name) {
     settings: "Einstellungen",
   }[name] || "Tag");
 
-  // render current tab
   if (name === "day") renderDay();
   if (name === "school") renderSchool();
   if (name === "work") renderWork();
@@ -357,14 +348,11 @@ function switchTab(name) {
    BIND APP UI
 ========================= */
 function bindApp() {
-  // bottom tabs
   document.querySelectorAll(".tabbtn").forEach((b) => (b.onclick = () => switchTab(b.dataset.tab)));
 
-  // topbar settings icon
   const openSettings = $("open-settings");
   if (openSettings) openSettings.onclick = () => switchTab("settings");
 
-  // day navigation
   const prev = $("day-prev");
   const next = $("day-next");
   const edit = $("day-edit");
@@ -373,23 +361,18 @@ function bindApp() {
   if (next) next.onclick = () => { state.selectedDate = addDaysISO(state.selectedDate, 1); renderAll(); };
   if (edit) edit.onclick = () => switchTab(isSchoolDay(state.selectedDate) ? "school" : "work");
 
-  // work note
   const note = $("work-note");
   if (note) {
     note.oninput = (e) => {
-  const all = getData(KEY.workEntries, {});
-  const d = all[state.selectedDate] || { tasks: [], note: "" };
-  d.note = e.target.value;
-  all[state.selectedDate] = d;
-  setData(KEY.workEntries, all);
-  renderDaySummary();
-  renderWorkPill();
-};
-
-note.onblur = () => {
-  saveDayToDB(state.selectedDate);
-};
-
+      const all = getData(KEY.workEntries, {});
+      const d = all[state.selectedDate] || { tasks: [], note: "" };
+      d.note = e.target.value;
+      all[state.selectedDate] = d;
+      setData(KEY.workEntries, all);
+      saveDayToDB(state.selectedDate);
+      renderDaySummary();
+      renderWorkPill();
+    };
   }
 }
 
@@ -485,7 +468,6 @@ function renderSchool() {
       a[state.selectedDate][s] = e.target.value;
       setData(KEY.schoolEntries, a);
       saveDayToDB(state.selectedDate);
-
       renderDaySummary();
       renderSchoolPill();
     };
@@ -585,7 +567,6 @@ function bindReport() {
   const prev = $("report-prev");
   const next = $("report-next");
 
-  // IMPORTANT: no copy-draft binding (doesn't exist)
   if (prev) prev.onclick = () => { state.reportWeekOffset--; renderReport(); };
   if (next) next.onclick = () => { state.reportWeekOffset++; renderReport(); };
 }
@@ -598,7 +579,6 @@ function renderReport() {
 
   const week = weekFrom(mo);
 
-  // week list
   const list = $("report-week-list");
   if (list) list.innerHTML = "";
 
@@ -647,7 +627,6 @@ function renderReport() {
   const stats = $("report-stats");
   if (stats) stats.textContent = `Arbeitstage: ${workDays} • Schultage: ${schoolDays}`;
 
-  // write drafts into the 2 textareas
   buildDraft(week);
 }
 
@@ -656,16 +635,14 @@ function buildDraft(week) {
   const workEntries = getData(KEY.workEntries, {});
   const subjects = getData(KEY.subjects, []);
 
-  /* =========
-     ARBEIT – schöner Wochen-Text (A)
-  ========= */
+  // ARBEIT – Wochen-Text
   let taskCount = {};
   let notes = [];
 
   week.forEach((date) => {
     if (!isSchoolDay(date)) {
       const day = workEntries[date] || { tasks: [], note: "" };
-      day.tasks.forEach((t) => taskCount[t] = (taskCount[t] || 0) + 1);
+      (day.tasks || []).forEach((t) => taskCount[t] = (taskCount[t] || 0) + 1);
       if ((day.note || "").trim()) notes.push(day.note.trim());
     }
   });
@@ -689,9 +666,7 @@ function buildDraft(week) {
     workText += `Besondere Vorkommnisse waren: ${notes[0]}.`;
   }
 
-  /* =========
-     SCHULE – Stichpunkte
-  ========= */
+  // SCHULE – Stichpunkte
   let schoolLines = [];
 
   week.forEach((date) => {
@@ -725,7 +700,6 @@ function bindSettings() {
       setData(KEY.darkMode, e.target.checked);
       applyDark();
       saveConfigToDB();
-
     };
   }
 
@@ -739,8 +713,8 @@ function bindSettings() {
     if (!s.includes(v)) s.push(v);
     setData(KEY.subjects, s);
     saveConfigToDB();
-    if (input) input.value = "";
 
+    if (input) input.value = "";
     renderSettings();
     renderSchool();
   };
@@ -754,11 +728,9 @@ function bindSettings() {
     const t = getData(KEY.workTemplates, {});
     if (!t[v]) t[v] = [];
     setData(KEY.workTemplates, t);
-    
     saveConfigToDB();
 
     if (input) input.value = "";
-
     renderSettings();
     renderWork();
   };
@@ -778,7 +750,6 @@ function bindSettings() {
     saveConfigToDB();
 
     if (input) input.value = "";
-
     renderSettings();
     renderWork();
   };
@@ -848,7 +819,6 @@ function renderSettingsSchoolDays() {
       setData(KEY.schoolDays, x);
       saveConfigToDB();
 
-
       renderSettingsSchoolDays();
       renderAll();
       renderSchool();
@@ -887,14 +857,13 @@ function renderSettingsTaskList(cat) {
   (t[cat] || []).forEach((task) => {
     const r = document.createElement("div");
     r.className = "list-row";
-    r.innerHTML = `<div>${esc(task)}</div><button class="btn btn-ghost" type="button">✕</button>`;
+    r.innerHTML = `<div>${esc(task)}</div><button class="btn btn-ghost" type="button" style="width:auto;padding:8px 10px;">✕</button>`;
     r.querySelector("button").onclick = () => {
       const x = getData(KEY.workTemplates, {});
       x[cat] = (x[cat] || []).filter((z) => z !== task);
       setData(KEY.workTemplates, x);
-      renderSettingsTaskList(cat);
       saveConfigToDB();
-
+      renderSettingsTaskList(cat);
       renderWork();
     };
     list.appendChild(r);
@@ -917,7 +886,6 @@ function bindSetup() {
     saveConfigToDB();
 
     if (input) input.value = "";
-
     renderSetupSubjects();
   };
 
@@ -943,8 +911,8 @@ function bindSetup() {
     if (!t[v]) t[v] = [];
     setData(KEY.workTemplates, t);
     saveConfigToDB();
-    if (input) input.value = "";
 
+    if (input) input.value = "";
     renderSetupTemplates();
   };
 
@@ -961,8 +929,8 @@ function bindSetup() {
     if (!t[cat].includes(v)) t[cat].push(v);
     setData(KEY.workTemplates, t);
     saveConfigToDB();
-    if (input) input.value = "";
 
+    if (input) input.value = "";
     renderSetupTemplatesTaskList(cat);
   };
 
@@ -1000,6 +968,7 @@ function renderSetupSubjects() {
     c.innerHTML = `${esc(s)} <span class="x">✕</span>`;
     c.onclick = () => {
       setData(KEY.subjects, getData(KEY.subjects, []).filter((x) => x !== s));
+      saveConfigToDB();
       renderSetupSubjects();
     };
     list.appendChild(c);
@@ -1022,7 +991,6 @@ function renderSetupSchoolDays() {
       (i >= 0) ? x.splice(i, 1) : x.push(w.id);
       setData(KEY.schoolDays, x);
       saveConfigToDB();
-
       renderSetupSchoolDays();
     };
     g.appendChild(b);
@@ -1058,11 +1026,12 @@ function renderSetupTemplatesTaskList(cat) {
   (t[cat] || []).forEach((task) => {
     const r = document.createElement("div");
     r.className = "list-row";
-    r.innerHTML = `<div>${esc(task)}</div><button class="btn btn-ghost" type="button">✕</button>`;
+    r.innerHTML = `<div>${esc(task)}</div><button class="btn btn-ghost" type="button" style="width:auto;padding:8px 10px;">✕</button>`;
     r.querySelector("button").onclick = () => {
       const x = getData(KEY.workTemplates, {});
       x[cat] = (x[cat] || []).filter((z) => z !== task);
       setData(KEY.workTemplates, x);
+      saveConfigToDB();
       renderSetupTemplatesTaskList(cat);
     };
     list.appendChild(r);

@@ -45,3 +45,4 @@ self.addEventListener("fetch", (event) => {
       .catch(() => caches.match(req).then((c) => c || caches.match("./index.html")))
   );
 });
+    

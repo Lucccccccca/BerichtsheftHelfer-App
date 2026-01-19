@@ -11,7 +11,8 @@
 // =========================
 const SUPABASE_URL = "https://epeqhchtatxgninetvid.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwZXFoY2h0YXR4Z25pbmV0dmlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTIyNTIsImV4cCI6MjA4NDQyODI1Mn0.5yNc888ypwrAcUGvSZM8CfssRMbcovBFyltkSx6fErA";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// FIXED: Umbenennung zu supabaseClient, um SyntaxError durch CDN-Konflikt zu vermeiden
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
 
@@ -129,10 +130,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindAuth();
 
   // Auth Session check
-  const { data } = await supabase.auth.getSession();
+  const { data } = await supabaseClient.auth.getSession();
   currentUser = data.session?.user || null;
 
-  supabase.auth.onAuthStateChange((_event, session) => {
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
     currentUser = session?.user || null;
     if (!currentUser) {
       showLogin();
@@ -171,7 +172,7 @@ function bindAuth() {
     if (!email || !pass) { if (msg) msg.textContent = "Bitte E-Mail + Passwort eingeben."; return; }
 
     if (msg) msg.textContent = "Login...";
-    const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
     if (error) { if (msg) msg.textContent = "Fehler: " + error.message; }
   };
 
@@ -181,7 +182,7 @@ function bindAuth() {
     if (!email || !pass) { if (msg) msg.textContent = "Bitte E-Mail + Passwort eingeben."; return; }
 
     if (msg) msg.textContent = "Registrierung...";
-    const { error } = await supabase.auth.signUp({ email, password: pass });
+    const { error } = await supabaseClient.auth.signUp({ email, password: pass });
     if (error) { if (msg) msg.textContent = "Fehler: " + error.message; }
     else { if (msg) msg.textContent = "Account erstellt. Du kannst dich jetzt einloggen."; }
   };
@@ -191,7 +192,7 @@ async function ensureUserConfigRow() {
   if (!currentUser) return;
   const user_id = currentUser.id;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("user_config")
     .select("user_id")
     .eq("user_id", user_id)
@@ -209,7 +210,7 @@ async function ensureUserConfigRow() {
       updated_at: new Date().toISOString(),
     };
 
-    const ins = await supabase.from("user_config").insert(payload);
+    const ins = await supabaseClient.from("user_config").insert(payload);
     if (ins.error) throw ins.error;
   }
 }
@@ -221,7 +222,7 @@ async function syncDownAll() {
   const user_id = currentUser.id;
 
   // 1) Config runterladen
-  const cfgRes = await supabase
+  const cfgRes = await supabaseClient
     .from("user_config")
     .select("*")
     .eq("user_id", user_id)
@@ -240,7 +241,7 @@ async function syncDownAll() {
   const from = new Date(); from.setDate(from.getDate() - 90);
   const fromISO = from.toISOString().slice(0, 10);
 
-  const entRes = await supabase
+  const entRes = await supabaseClient
     .from("day_entries")
     .select("day, school, work")
     .eq("user_id", user_id)
@@ -279,7 +280,7 @@ async function saveConfigToDB() {
     updated_at: new Date().toISOString(),
   };
 
-  const res = await supabase.from("user_config").upsert(payload);
+  const res = await supabaseClient.from("user_config").upsert(payload);
   if (res.error) console.error(res.error);
 }
 
@@ -298,7 +299,7 @@ async function saveDayToDB(dayISO) {
     updated_at: new Date().toISOString(),
   };
 
-  const res = await supabase.from("day_entries").upsert(payload);
+  const res = await supabaseClient.from("day_entries").upsert(payload);
   if (res.error) console.error(res.error);
 }
 

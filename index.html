@@ -1,64 +1,266 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0b0b0f" />
-
-  <!-- iOS PWA -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0b0b10" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Berichtsheft</title>
 
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css" />
-
-  <title>Berichtsheft</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
-  <div class="app" id="appRoot">
-    <!-- Header -->
-    <header class="header">
-      <div class="header-left">
-        <div class="app-title" id="headerTitle">Berichtsheft</div>
-        <div class="app-subtitle" id="headerSubtitle">Offline • Lokal gespeichert</div>
-      </div>
-      <div class="header-right">
-        <button class="icon-btn" id="quickSettingsBtn" title="Einstellungen" aria-label="Einstellungen">
-          <span class="icon">⚙️</span>
-        </button>
-      </div>
+  <!-- SETUP SCREEN -->
+  <section id="setup-screen" class="screen hidden">
+    <header class="topbar">
+      <div class="topbar-title">Ersteinrichtung</div>
+      <div class="topbar-subtitle" id="setup-progress">1 / 3</div>
     </header>
 
-    <!-- Main content -->
-    <main class="content" id="content"></main>
+    <main class="content">
+      <!-- STEP 1: SUBJECTS -->
+      <div class="setup-step" data-step="1">
+        <h2 class="h2">Schulfächer</h2>
+        <p class="muted">Trag deine Berufsschulfächer ein. Du kannst das später in den Einstellungen ändern.</p>
+
+        <div class="card">
+          <div class="row">
+            <input id="setup-subject-input" class="input" placeholder="z.B. Rechnungswesen" />
+            <button id="setup-add-subject" class="btn btn-primary">+</button>
+          </div>
+          <div id="setup-subject-list" class="chips"></div>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-primary btn-wide" id="setup-next-1">Weiter</button>
+        </div>
+      </div>
+
+      <!-- STEP 2: SCHOOL DAYS -->
+      <div class="setup-step hidden" data-step="2">
+        <h2 class="h2">Berufsschultage</h2>
+        <p class="muted">Wähle die Wochentage aus, an denen du Schule hast.</p>
+
+        <div class="card">
+          <div class="weekday-grid" id="setup-schooldays"></div>
+        </div>
+
+        <div class="actions two">
+          <button class="btn btn-ghost" id="setup-back-2">Zurück</button>
+          <button class="btn btn-primary" id="setup-next-2">Weiter</button>
+        </div>
+      </div>
+
+      <!-- STEP 3: WORK TEMPLATES -->
+      <div class="setup-step hidden" data-step="3">
+        <h2 class="h2">Arbeitstätigkeiten</h2>
+        <p class="muted">Lege Vorlagen an. In „Arbeit“ kannst du sie pro Tag einfach ankreuzen.</p>
+
+        <div class="card">
+          <div class="row">
+            <input id="setup-category-input" class="input" placeholder="Kategorie (z.B. Kasse)" />
+            <button id="setup-add-category" class="btn btn-primary">+</button>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="row">
+            <select id="setup-category-select" class="select"></select>
+          </div>
+
+          <div class="row">
+            <input id="setup-task-input" class="input" placeholder="Tätigkeit (z.B. Kassieren)" />
+            <button id="setup-add-task" class="btn btn-primary">+</button>
+          </div>
+
+          <div id="setup-task-list" class="list"></div>
+        </div>
+
+        <div class="actions two">
+          <button class="btn btn-ghost" id="setup-back-3">Zurück</button>
+          <button class="btn btn-primary" id="setup-finish">Fertig</button>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- APP SCREEN -->
+  <section id="app-screen" class="screen hidden">
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="topbar-title" id="topbar-title">Tag</div>
+      <button class="icon-btn" id="open-settings" title="Einstellungen">
+        ⚙️
+      </button>
+    </header>
+
+    <!-- Content -->
+    <main class="content">
+      <!-- TAG -->
+      <section id="tab-day" class="tab-page">
+        <div class="card">
+          <div class="row between">
+            <button class="btn btn-ghost" id="day-prev">◀</button>
+            <div class="center">
+              <div class="date-big" id="day-date">-</div>
+              <div class="muted" id="day-type">-</div>
+            </div>
+            <button class="btn btn-ghost" id="day-next">▶</button>
+          </div>
+          <div class="divider"></div>
+          <button class="btn btn-primary btn-wide" id="day-edit">Eintrag bearbeiten</button>
+        </div>
+
+        <div class="card">
+          <div class="row between">
+            <div>
+              <div class="h3">Schnellübersicht</div>
+              <div class="muted">Was ist heute gespeichert?</div>
+            </div>
+            <div class="pill" id="day-summary-pill">0</div>
+          </div>
+          <div class="divider"></div>
+          <div id="day-summary" class="muted"></div>
+        </div>
+      </section>
+
+      <!-- SCHULE -->
+      <section id="tab-school" class="tab-page hidden">
+        <div class="card">
+          <div class="row between">
+            <div>
+              <div class="h3">Schule</div>
+              <div class="muted" id="school-date">-</div>
+            </div>
+            <div class="pill" id="school-pill">0</div>
+          </div>
+        </div>
+
+        <div id="school-list"></div>
+      </section>
+
+      <!-- ARBEIT -->
+      <section id="tab-work" class="tab-page hidden">
+        <div class="card">
+          <div class="row between">
+            <div>
+              <div class="h3">Arbeit</div>
+              <div class="muted" id="work-date">-</div>
+            </div>
+            <div class="pill" id="work-pill">0</div>
+          </div>
+        </div>
+
+        <div id="work-list"></div>
+
+        <div class="card">
+          <div class="h3">Notizen</div>
+          <textarea id="work-note" class="textarea" placeholder="Besonderheiten / Neues gelernt..."></textarea>
+        </div>
+      </section>
+
+      <!-- BERICHTSHEFT -->
+      <section id="tab-report" class="tab-page hidden">
+        <div class="card">
+          <div class="row between">
+            <div>
+              <div class="h3">Berichtsheft</div>
+              <div class="muted" id="report-week">Woche</div>
+            </div>
+            <button class="btn btn-ghost" id="report-prev">◀</button>
+            <button class="btn btn-ghost" id="report-next">▶</button>
+          </div>
+          <div class="divider"></div>
+          <div id="report-week-list" class="week-list"></div>
+        </div>
+
+        <div class="card">
+          <div class="h3">Statistik (Woche)</div>
+          <div class="muted" id="report-stats">-</div>
+        </div>
+
+        <div class="card">
+          <div class="row between">
+            <div>
+              <div class="h3">Text-Entwurf</div>
+              <div class="muted">Aus Häkchen + Notizen zusammengefasst</div>
+            </div>
+            <button class="btn btn-ghost" id="copy-draft">Kopieren</button>
+          </div>
+          <textarea id="report-draft" class="textarea" readonly></textarea>
+        </div>
+      </section>
+
+      <!-- EINSTELLUNGEN -->
+      <section id="tab-settings" class="tab-page hidden">
+        <div class="card">
+          <div class="row between">
+            <div>
+              <div class="h3">Dark Mode</div>
+              <div class="muted">iOS Look</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="dark-toggle" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="h3">Schulfächer</div>
+          <div class="row">
+            <input id="settings-subject-input" class="input" placeholder="Neues Fach" />
+            <button id="settings-add-subject" class="btn btn-primary">+</button>
+          </div>
+          <div id="settings-subject-list" class="chips"></div>
+        </div>
+
+        <div class="card">
+          <div class="h3">Berufsschultage</div>
+          <div class="weekday-grid" id="settings-schooldays"></div>
+        </div>
+
+        <div class="card">
+          <div class="h3">Arbeitstätigkeiten (Vorlagen)</div>
+          <div class="row">
+            <input id="settings-category-input" class="input" placeholder="Kategorie" />
+            <button id="settings-add-category" class="btn btn-primary">+</button>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="row">
+            <select id="settings-category-select" class="select"></select>
+          </div>
+
+          <div class="row">
+            <input id="settings-task-input" class="input" placeholder="Tätigkeit" />
+            <button id="settings-add-task" class="btn btn-primary">+</button>
+          </div>
+
+          <div id="settings-task-list" class="list"></div>
+        </div>
+
+        <div class="card danger">
+          <div class="h3">Reset</div>
+          <p class="muted">Setzt die komplette App zurück (alle Daten gelöscht).</p>
+          <button class="btn btn-danger btn-wide" id="reset-all">Alles zurücksetzen</button>
+        </div>
+      </section>
+    </main>
 
     <!-- Bottom Tabs -->
-    <nav class="tabs" id="tabs">
-      <button class="tab active" data-tab="day">
-        <span class="tab-ico">📅</span>
-        <span class="tab-label">Tag</span>
-      </button>
-      <button class="tab" data-tab="school">
-        <span class="tab-ico">🎓</span>
-        <span class="tab-label">Schule</span>
-      </button>
-      <button class="tab" data-tab="work">
-        <span class="tab-ico">🧰</span>
-        <span class="tab-label">Arbeit</span>
-      </button>
-      <button class="tab" data-tab="report">
-        <span class="tab-ico">📊</span>
-        <span class="tab-label">Berichtsheft</span>
-      </button>
-      <button class="tab" data-tab="settings">
-        <span class="tab-ico">⚙️</span>
-        <span class="tab-label">Einstellungen</span>
-      </button>
+    <nav class="tabbar">
+      <button class="tabbtn active" data-tab="day">Tag</button>
+      <button class="tabbtn" data-tab="school">Schule</button>
+      <button class="tabbtn" data-tab="work">Arbeit</button>
+      <button class="tabbtn" data-tab="report">Berichtsheft</button>
+      <button class="tabbtn" data-tab="settings">Einstellungen</button>
     </nav>
-  </div>
-
-  <div class="toast" id="toast" aria-live="polite"></div>
+  </section>
 
   <script src="app.js"></script>
 </body>

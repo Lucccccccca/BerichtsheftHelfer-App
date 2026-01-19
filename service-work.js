@@ -1,43 +1,35 @@
-// service-worker.js
+// service-work.js (offline + installierbar)
 const CACHE_NAME = "berichtsheft-cache-v1";
 
-// Passe die Liste an deine echten Dateien an:
-const ASSETS_TO_CACHE = [
+const ASSETS = [
   "./",
   "./index.html",
   "./style.css",
   "./app.js",
-  "./manifest.json",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
-  "./icons/icon-512-maskable.png"
+  "./manifest.json"
 ];
 
-// Install: Dateien cachen
+// Install
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
   );
   self.skipWaiting();
 });
 
-// Activate: alte Caches löschen
+// Activate
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(
-        keys.map((key) => (key !== CACHE_NAME ? caches.delete(key) : null))
-      )
+      Promise.all(keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : null)))
     )
   );
   self.clients.claim();
 });
 
-// Fetch: Cache-first für Assets, fallback auf Netzwerk
+// Fetch (cache-first)
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-
-  // Nur GET requests cachen
   if (req.method !== "GET") return;
 
   event.respondWith(
@@ -46,15 +38,11 @@ self.addEventListener("fetch", (event) => {
 
       return fetch(req)
         .then((res) => {
-          // Optional: neue Requests dynamisch nachcachen
-          const resClone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone));
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
           return res;
         })
-        .catch(() => {
-          // Offline-Fallback: versuche index.html
-          return caches.match("./index.html");
-        });
+        .catch(() => caches.match("./index.html"));
     })
   );
 });

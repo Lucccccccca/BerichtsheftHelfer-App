@@ -260,6 +260,7 @@ async function syncDownAll() {
 
   setData(KEY.schoolEntries, schoolEntries);
   setData(KEY.workEntries, workEntries);
+  saveDayToDB(state.selectedDate);
 
   // UI neu rendern
   renderAll();
@@ -381,8 +382,9 @@ function bindApp() {
       d.note = e.target.value;
       all[state.selectedDate] = d;
       setData(KEY.workEntries, all);
-      renderDaySummary();
-      renderWorkPill();
+    saveDayToDB(state.selectedDate);
+    renderDaySummary();
+    renderWorkPill();
     };
   }
 }
@@ -546,6 +548,7 @@ function renderWork() {
 
         a[state.selectedDate] = x;
         setData(KEY.workEntries, a);
+        saveDayToDB(state.selectedDate);
 
         renderDaySummary();
         renderWorkPill();
@@ -715,6 +718,8 @@ function bindSettings() {
     dt.onchange = (e) => {
       setData(KEY.darkMode, e.target.checked);
       applyDark();
+      saveConfigToDB();
+
     };
   }
 
@@ -727,6 +732,7 @@ function bindSettings() {
     const s = getData(KEY.subjects, []);
     if (!s.includes(v)) s.push(v);
     setData(KEY.subjects, s);
+    saveConfigToDB();
     if (input) input.value = "";
 
     renderSettings();
@@ -742,6 +748,9 @@ function bindSettings() {
     const t = getData(KEY.workTemplates, {});
     if (!t[v]) t[v] = [];
     setData(KEY.workTemplates, t);
+    
+    saveConfigToDB();
+
     if (input) input.value = "";
 
     renderSettings();
@@ -760,6 +769,8 @@ function bindSettings() {
     if (!t[cat]) t[cat] = [];
     if (!t[cat].includes(v)) t[cat].push(v);
     setData(KEY.workTemplates, t);
+    saveConfigToDB();
+
     if (input) input.value = "";
 
     renderSettings();
@@ -828,6 +839,8 @@ function renderSettingsSchoolDays() {
       const i = x.indexOf(w.id);
       (i >= 0) ? x.splice(i, 1) : x.push(w.id);
       setData(KEY.schoolDays, x);
+      saveConfigToDB();
+
 
       renderSettingsSchoolDays();
       renderAll();

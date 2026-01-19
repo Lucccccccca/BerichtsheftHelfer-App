@@ -377,15 +377,19 @@ function bindApp() {
   const note = $("work-note");
   if (note) {
     note.oninput = (e) => {
-      const all = getData(KEY.workEntries, {});
-      const d = all[state.selectedDate] || { tasks: [], note: "" };
-      d.note = e.target.value;
-      all[state.selectedDate] = d;
-      setData(KEY.workEntries, all);
-    saveDayToDB(state.selectedDate);
-    renderDaySummary();
-    renderWorkPill();
-    };
+  const all = getData(KEY.workEntries, {});
+  const d = all[state.selectedDate] || { tasks: [], note: "" };
+  d.note = e.target.value;
+  all[state.selectedDate] = d;
+  setData(KEY.workEntries, all);
+  renderDaySummary();
+  renderWorkPill();
+};
+
+note.onblur = () => {
+  saveDayToDB(state.selectedDate);
+};
+
   }
 }
 

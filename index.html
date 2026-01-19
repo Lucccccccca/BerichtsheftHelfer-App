@@ -20,6 +20,29 @@
   <div class="app-wrap">
     <div class="app">
 
+        <!-- LOGIN SCREEN -->
+<div id="login-screen" class="hidden">
+  <div class="panel" style="max-width:520px;margin:18px auto;">
+    <div class="h2" style="margin:0 0 6px 0;">Anmelden</div>
+    <div class="muted" style="margin-bottom:12px;">Damit deine Daten sicher gespeichert sind.</div>
+
+    <label class="muted" style="display:block;margin:10px 0 6px;">E-Mail</label>
+    <input id="login-email" class="input" type="email" placeholder="name@mail.de" />
+
+    <label class="muted" style="display:block;margin:10px 0 6px;">Passwort</label>
+    <input id="login-pass" class="input" type="password" placeholder="••••••••" />
+
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button id="login-btn" class="btn" type="button">Login</button>
+      <button id="signup-btn" class="btn btn-ghost" type="button">Registrieren</button>
+    </div>
+
+    <div id="login-msg" class="muted" style="margin-top:12px;"></div>
+  </div>
+</div>
+
+
+
       <!-- =========================
            SETUP SCREEN
       ========================== -->
@@ -284,6 +307,8 @@
   </div>
 
   <script src="./app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./app.js"></script>
 
   <script>
     if ("serviceWorker" in navigator) {

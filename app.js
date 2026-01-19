@@ -5,6 +5,23 @@
    - tabs: day, school, work, report, settings
    - report-draft-school + report-draft-work (KEIN copy-draft / KEIN report-draft)
 ========================================================= */
+    // =========================
+// SUPABASE CONFIG
+// =========================
+const SUPABASE_URL = "https://epeqhchtatxgninetvid.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwZXFoY2h0YXR4Z25pbmV0dmlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTIyNTIsImV4cCI6MjA4NDQyODI1Mn0.5yNc888ypwrAcUGvSZM8CfssRMbcovBFyltkSx6fErA";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+
+function showLogin() {
+  show($("login-screen"));
+  hide($("setup-screen"));
+  hide($("app-screen"));
+}
+function hideLogin() {
+  hide($("login-screen"));
+}
 
 /* =========================
    STATE
@@ -99,24 +116,195 @@ function weekFrom(mo) { return Array.from({ length: 7 }, (_, i) => addDaysISO(mo
 /* =========================
    INIT
 ========================= */
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   ensureDefaults();
   applyDark();
 
+  // UI bindings
   bindSetup();
   bindApp();
   bindSettings();
   bindReport();
+  bindAuth();
 
-  const setupDone = getData(KEY.setupDone, false);
-  if (!setupDone) {
-    showSetup();
-  } else {
-    showApp();
-    switchTab("day");
-    renderAll();
+  // Auth Session check
+  const { data } = await supabase.auth.getSession();
+  currentUser = data.session?.user || null;
+
+  supabase.auth.onAuthStateChange((_event, session) => {
+    currentUser = session?.user || null;
+    if (!currentUser) {
+      showLogin();
+    } else {
+      hideLogin();
+      // App anzeigen
+      if (!getData(KEY.setupDone, false)) showSetup();
+      else { showApp(); switchTab("day"); renderAll(); }
+      // Daten aus DB ziehen
+      syncDownAll().catch(console.error);
+    }
+  });
+
+  // Beim Start
+  if (!currentUser) {
+    showLogin();
+    return;
   }
+
+  // bereits eingeloggt
+  hideLogin();
+  if (!getData(KEY.setupDone, false)) showSetup();
+  else { showApp(); switchTab("day"); renderAll(); }
+  await syncDownAll();
 });
+
+
+
+    function bindAuth() {
+  const loginBtn = $("login-btn");
+  const signupBtn = $("signup-btn");
+  const msg = $("login-msg");
+
+  if (loginBtn) loginBtn.onclick = async () => {
+    const email = ($("login-email")?.value || "").trim();
+    const pass = ($("login-pass")?.value || "").trim();
+    if (!email || !pass) { if(msg) msg.textContent="Bitte E-Mail + Passwort eingeben."; return; }
+
+    if (msg) msg.textContent = "Login...";
+    const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+    if (error) { if(msg) msg.textContent = "Fehler: " + error.message; }
+  };
+
+  if (signupBtn) signupBtn.onclick = async () => {
+    const email = ($("login-email")?.value || "").trim();
+    const pass = ($("login-pass")?.value || "").trim();
+    if (!email || !pass) { if(msg) msg.textContent="Bitte E-Mail + Passwort eingeben."; return; }
+
+    if (msg) msg.textContent = "Registrierung...";
+    const { error } = await supabase.auth.signUp({ email, password: pass });
+    if (error) { if(msg) msg.textContent = "Fehler: " + error.message; }
+    else { if(msg) msg.textContent = "Account erstellt. Du kannst dich jetzt einloggen."; }
+  };
+}
+
+async function ensureUserConfigRow() {
+  if (!currentUser) return;
+  const user_id = currentUser.id;
+
+  const { data, error } = await supabase
+    .from("user_config")
+    .select("user_id")
+    .eq("user_id", user_id)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  if (!data) {
+    // initial config aus localStorage übernehmen
+    const payload = {
+      user_id,
+      dark_mode: getData(KEY.darkMode, true),
+      school_days: getData(KEY.schoolDays, []),
+      subjects: getData(KEY.subjects, []),
+      work_templates: getData(KEY.workTemplates, {}),
+      updated_at: new Date().toISOString(),
+    };
+
+    const ins = await supabase.from("user_config").insert(payload);
+    if (ins.error) throw ins.error;
+  }
+}
+
+async function syncDownAll() {
+  if (!currentUser) return;
+  await ensureUserConfigRow();
+
+  const user_id = currentUser.id;
+
+  // 1) Config runterladen
+  const cfgRes = await supabase
+    .from("user_config")
+    .select("*")
+    .eq("user_id", user_id)
+    .single();
+
+  if (cfgRes.error) throw cfgRes.error;
+
+  const cfg = cfgRes.data;
+  setData(KEY.darkMode, !!cfg.dark_mode);
+  setData(KEY.schoolDays, cfg.school_days || []);
+  setData(KEY.subjects, cfg.subjects || []);
+  setData(KEY.workTemplates, cfg.work_templates || {});
+  applyDark();
+
+  // 2) Einträge (nur letzte 90 Tage als Start – reicht erstmal)
+  const from = new Date(); from.setDate(from.getDate() - 90);
+  const fromISO = from.toISOString().slice(0,10);
+
+  const entRes = await supabase
+    .from("day_entries")
+    .select("day, school, work")
+    .eq("user_id", user_id)
+    .gte("day", fromISO);
+
+  if (entRes.error) throw entRes.error;
+
+  const schoolEntries = getData(KEY.schoolEntries, {});
+  const workEntries = getData(KEY.workEntries, {});
+
+  for (const row of (entRes.data || [])) {
+    const day = row.day; // YYYY-MM-DD
+    if (row.school) schoolEntries[day] = row.school;
+    if (row.work) workEntries[day] = row.work;
+  }
+
+  setData(KEY.schoolEntries, schoolEntries);
+  setData(KEY.workEntries, workEntries);
+
+  // UI neu rendern
+  renderAll();
+  renderSchool();
+  renderWork();
+  renderReport();
+}
+
+async function saveConfigToDB() {
+  if (!currentUser) return;
+  const user_id = currentUser.id;
+
+  const payload = {
+    user_id,
+    dark_mode: getData(KEY.darkMode, true),
+    school_days: getData(KEY.schoolDays, []),
+    subjects: getData(KEY.subjects, []),
+    work_templates: getData(KEY.workTemplates, {}),
+    updated_at: new Date().toISOString(),
+  };
+
+  const res = await supabase.from("user_config").upsert(payload);
+  if (res.error) console.error(res.error);
+}
+
+async function saveDayToDB(dayISO) {
+  if (!currentUser) return;
+  const user_id = currentUser.id;
+
+  const school = (getData(KEY.schoolEntries, {})[dayISO] || {});
+  const work = (getData(KEY.workEntries, {})[dayISO] || { tasks: [], note: "" });
+
+  const payload = {
+    user_id,
+    day: dayISO,
+    school,
+    work,
+    updated_at: new Date().toISOString(),
+  };
+
+  const res = await supabase.from("day_entries").upsert(payload);
+  if (res.error) console.error(res.error);
+}
+
+
 
 /* =========================
    SCREEN SWITCH

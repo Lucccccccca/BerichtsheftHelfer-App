@@ -1,4 +1,4 @@
-// service-work.js (offline + installierbar)
+// service-work.js  Paswort,25! (offline + installierbar)
 const CACHE_NAME = "berichtsheft-cache-v2";
 
 const ASSETS = [

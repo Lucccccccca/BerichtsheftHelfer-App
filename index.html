@@ -2,13 +2,13 @@
 <html lang="de">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Berichtsheft App</title>
 
   <link rel="manifest" href="./manifest.json" />
   <meta name="theme-color" content="#0b0d12" />
 
-  <!-- iOS (nice to have) -->
+  <!-- iOS -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Berichtsheft" />
@@ -33,11 +33,11 @@
 
         <div class="content">
 
-          <!-- STEP 1 -->
+          <!-- STEP 1: SUBJECTS -->
           <div class="setup-step" data-step="1">
             <div class="panel">
               <div class="h3">Schulfächer</div>
-              <div class="muted">Trag deine Berufsschulfächer ein. Du kannst das später in den Einstellungen ändern.</div>
+              <div class="muted">Trage deine Berufsschulfächer ein.</div>
               <div style="height:12px"></div>
 
               <div class="input-row">
@@ -52,11 +52,11 @@
             </div>
           </div>
 
-          <!-- STEP 2 -->
+          <!-- STEP 2: SCHOOL DAYS -->
           <div class="setup-step hidden" data-step="2">
             <div class="panel">
               <div class="h3">Berufsschultage</div>
-              <div class="muted">Wähle die Tage aus, an denen du Berufsschule hast.</div>
+              <div class="muted">Wähle deine Berufsschultage.</div>
               <div style="height:12px"></div>
 
               <div id="setup-schooldays" class="weekgrid"></div>
@@ -69,15 +69,15 @@
             </div>
           </div>
 
-          <!-- STEP 3 -->
+          <!-- STEP 3: WORK TEMPLATES -->
           <div class="setup-step hidden" data-step="3">
             <div class="panel">
               <div class="h3">Arbeitstätigkeiten</div>
-              <div class="muted">Erstelle Kategorien und Tätigkeiten, die du später pro Tag einfach ankreuzen kannst.</div>
+              <div class="muted">Lege Kategorien und Tätigkeiten an.</div>
               <div style="height:12px"></div>
 
               <div class="input-row">
-                <input id="setup-category-input" class="input" placeholder="Neue Kategorie (z.B. Kasse)" />
+                <input id="setup-category-input" class="input" placeholder="Kategorie (z.B. Kasse)" />
                 <button id="setup-add-category" class="round-btn" type="button">+</button>
               </div>
 
@@ -90,7 +90,7 @@
               <div style="height:12px"></div>
 
               <div class="input-row">
-                <input id="setup-task-input" class="input" placeholder="Neue Tätigkeit (z.B. Kassieren)" />
+                <input id="setup-task-input" class="input" placeholder="Tätigkeit (z.B. Kassieren)" />
                 <button id="setup-add-task" class="round-btn" type="button">+</button>
               </div>
 
@@ -112,7 +112,7 @@
       ========================== -->
       <div id="app-screen" class="screen hidden">
 
-        <!-- Topbar -->
+        <!-- TOPBAR -->
         <div class="topbar">
           <div class="topbar-row">
             <div id="topbar-title" class="topbar-title">Tag</div>
@@ -120,7 +120,6 @@
           </div>
         </div>
 
-        <!-- Tabs content -->
         <div class="content">
 
           <!-- TAB: DAY -->
@@ -131,7 +130,6 @@
               <div id="day-type" class="muted" style="margin-top:6px;"></div>
 
               <div style="height:12px"></div>
-
               <div class="btn-row">
                 <button id="day-prev" class="btn btn-ghost" type="button">◀</button>
                 <button id="day-edit" class="btn" type="button">Eintrag bearbeiten</button>
@@ -158,7 +156,6 @@
               </div>
               <div id="school-date" class="muted" style="margin-top:6px;"></div>
             </div>
-
             <div id="school-list"></div>
           </div>
 
@@ -182,6 +179,7 @@
 
           <!-- TAB: REPORT -->
           <div id="tab-report" class="tab-content hidden">
+
             <div class="panel">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <button id="report-prev" class="btn btn-ghost" type="button">◀</button>
@@ -194,13 +192,23 @@
             <div id="report-week-list" style="display:flex;flex-direction:column;gap:10px;"></div>
 
             <div class="panel">
-              <div style="display:flex;justify-content:space-between;align-items:center;">
-                <div class="h3" style="margin:0">Berichtsheft-Entwurf</div>
-                <button id="copy-draft" class="btn btn-ghost" style="width:auto;padding:10px 12px;" type="button">Kopieren</button>
-              </div>
-              <div style="height:10px"></div>
-              <textarea id="report-draft" class="textarea" placeholder="Hier erscheint dein Textentwurf..."></textarea>
+              <div class="h3">Berichtsheft – Schule</div>
+              <textarea
+                id="report-draft-school"
+                class="textarea"
+                placeholder="Hier erscheinen die Berufsschul-Themen...">
+              </textarea>
             </div>
+
+            <div class="panel">
+              <div class="h3">Berichtsheft – Arbeit</div>
+              <textarea
+                id="report-draft-work"
+                class="textarea"
+                placeholder="Hier erscheint der Wochen-Text aus der Arbeit...">
+              </textarea>
+            </div>
+
           </div>
 
           <!-- TAB: SETTINGS -->
@@ -212,7 +220,6 @@
                 <input id="dark-toggle" type="checkbox" />
                 <span>Dark Mode</span>
               </label>
-              <div class="muted">Wenn deaktiviert, ist die App im Light Mode.</div>
             </div>
 
             <div class="panel">
@@ -254,40 +261,23 @@
             </div>
 
             <div class="panel">
-              <button id="reset-all" class="btn" style="background:var(--danger);" type="button">Alles löschen & neu einrichten</button>
-              <div class="muted" style="margin-top:8px;">Löscht alle lokal gespeicherten Daten.</div>
+              <button id="reset-all" class="btn" style="background:#ff4d4d;" type="button">
+                Alles löschen & neu einrichten
+              </button>
             </div>
+
           </div>
 
         </div>
 
-        <!-- Bottom Tabbar -->
+        <!-- BOTTOM TABBAR -->
         <div class="tabbar">
-  <button class="tabbtn active" data-tab="day">
-    <span class="tabicon">📅</span>
-    <span class="tabtext">Tag</span>
-  </button>
-
-  <button class="tabbtn" data-tab="school">
-    <span class="tabicon">🎓</span>
-    <span class="tabtext">Schule</span>
-  </button>
-
-  <button class="tabbtn" data-tab="work">
-    <span class="tabicon">🧰</span>
-    <span class="tabtext">Arbeit</span>
-  </button>
-
-  <button class="tabbtn" data-tab="report">
-    <span class="tabicon">📊</span>
-    <span class="tabtext">Heft</span>
-  </button>
-
-  <button class="tabbtn" data-tab="settings">
-    <span class="tabicon">⚙️</span>
-    <span class="tabtext">Setup</span>
-  </button>
-</div>
+          <button class="tabbtn active" data-tab="day"><span class="tabicon">📅</span><span class="tabtext">Tag</span></button>
+          <button class="tabbtn" data-tab="school"><span class="tabicon">🎓</span><span class="tabtext">Schule</span></button>
+          <button class="tabbtn" data-tab="work"><span class="tabicon">🧰</span><span class="tabtext">Arbeit</span></button>
+          <button class="tabbtn" data-tab="report"><span class="tabicon">📊</span><span class="tabtext">Heft</span></button>
+          <button class="tabbtn" data-tab="settings"><span class="tabicon">⚙️</span><span class="tabtext">Setup</span></button>
+        </div>
 
       </div>
     </div>
@@ -295,7 +285,6 @@
 
   <script src="./app.js"></script>
 
-  <!-- Service Worker (deine Datei heißt service-work.js) -->
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {

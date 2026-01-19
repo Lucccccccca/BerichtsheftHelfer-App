@@ -370,3 +370,36 @@ body.light .week-item{ background: rgba(15,20,35,0.03); }
 .week-item:active{ transform: scale(var(--tap)); }
 .week-left{ display:flex; flex-direction:column; gap: 4px; }
 .week-date{ font-weight: 900; }
+
+
+
+/* =========================
+   Bottom Tab Icons
+========================= */
+
+.tabbtn{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap: 4px;
+}
+
+.tabicon{
+  font-size: 18px;
+  line-height: 1;
+}
+
+.tabtext{
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Active Tab stärker */
+.tabbtn.active .tabicon{
+  transform: translateY(-1px);
+}
+
+.tabbtn.active .tabtext{
+  color: var(--text);
+}

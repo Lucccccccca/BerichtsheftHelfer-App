@@ -51,8 +51,9 @@ function ensureDefaults() {
   if (getData(KEY.schoolDays, null) === null) setData(KEY.schoolDays, []);
   if (getData(KEY.workTemplates, null) === null) {
     setData(KEY.workTemplates, {
-      Kasse: ["Kassieren", "Pfand", "Kundenservice"],
-      Ware: ["Lieferung verräumen", "Abschachteln", "MHD/Rotation"],
+      Kasse: ["Kassieren"],
+      Service: ["Pfand", "HGA", "Putzen"],
+      Ware: ["Lieferung verräumen", "Abschachteln", "MHD Kontrolle", "DD Fahren"],
       "Bake-Off": ["Auflegen", "Nachbacken", "Reinigen"],
     });
   }

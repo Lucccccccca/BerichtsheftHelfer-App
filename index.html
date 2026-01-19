@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0b0f" />
+
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+
+  <title>Berichtsheft</title>
+</head>
+
+<body>
+  <div class="app" id="appRoot">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="app-title" id="headerTitle">Berichtsheft</div>
+        <div class="app-subtitle" id="headerSubtitle">Offline • Lokal gespeichert</div>
+      </div>
+      <div class="header-right">
+        <button class="icon-btn" id="quickSettingsBtn" title="Einstellungen" aria-label="Einstellungen">
+          <span class="icon">⚙️</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="content" id="content"></main>
+
+    <!-- Bottom Tabs -->
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="day">
+        <span class="tab-ico">📅</span>
+        <span class="tab-label">Tag</span>
+      </button>
+      <button class="tab" data-tab="school">
+        <span class="tab-ico">🎓</span>
+        <span class="tab-label">Schule</span>
+      </button>
+      <button class="tab" data-tab="work">
+        <span class="tab-ico">🧰</span>
+        <span class="tab-label">Arbeit</span>
+      </button>
+      <button class="tab" data-tab="report">
+        <span class="tab-ico">📊</span>
+        <span class="tab-label">Berichtsheft</span>
+      </button>
+      <button class="tab" data-tab="settings">
+        <span class="tab-ico">⚙️</span>
+        <span class="tab-label">Einstellungen</span>
+      </button>
+    </nav>
+  </div>
+
+  <div class="toast" id="toast" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

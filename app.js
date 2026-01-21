@@ -1,23 +1,27 @@
 /**
  * app.js - Vollständige Logik für Berichtsheft Pro
- * Optimierte Version zur Vermeidung von 404-Log-Fehlern und Verbindungsabbrüchen
+ * Optimierte Version zur Vermeidung von 404-Log-Fehlern und Verbindungsabbrüchen.
+ * Enthält Fehler-Resilienz gegen Browser-Extension-Konflikte.
  */
 
 // --- KONFIGURATION ---
 const SUPABASE_URL = "https://epeqhchtatxgninetvid.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwZXFoY2h0YXR4Z25pbmV0dmlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTIyNTIsImV4cCI6MjA4NDQyODI1Mn0.5yNc888ypwrAcUGvSZM8CfssRMbcovBFyltkSx6fErA";
 
-let supabaseClient;
+let supabaseClient = null;
 
-// Initialisierung mit Fehlerprüfung
-try {
-  if (window.supabase) {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  } else {
-    console.error("Supabase Library nicht geladen.");
+// Robuste Initialisierung des Clients
+function initSupabase() {
+  try {
+    if (window.supabase) {
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    } else {
+      console.warn("Supabase CDN noch nicht bereit, warte kurz...");
+      setTimeout(initSupabase, 500);
+    }
+  } catch (e) {
+    console.error("Kritischer Initialisierungsfehler:", e);
   }
-} catch (e) {
-  console.error("Initialisierungsfehler:", e);
 }
 
 // --- STATE & KEYS ---
@@ -60,14 +64,15 @@ async function initAuth() {
   if (!supabaseClient) return;
   
   try {
-    const { data: { session } } = await supabaseClient.auth.getSession();
+    const { data: { session }, error } = await supabaseClient.auth.getSession();
+    if (error) throw error;
     handleUser(session?.user || null);
 
     supabaseClient.auth.onAuthStateChange((_event, session) => {
       handleUser(session?.user || null);
     });
   } catch (err) {
-    console.warn("Auth Session nicht verfügbar.");
+    console.log("Session-Check übersprungen oder offline.");
   }
 }
 
@@ -80,7 +85,7 @@ function handleUser(user) {
   } else {
     hide($("login-screen"));
     // Erst schauen ob Cloud-Daten da sind, dann entscheiden ob Setup oder App
-    syncDown().then(() => {
+    syncDown().finally(() => {
       if (!getData(KEY.setup, false)) {
         show($("setup-screen"));
         renderSetup();
@@ -95,37 +100,37 @@ function handleUser(user) {
 
 // --- INITIALISIERUNG ---
 document.addEventListener("DOMContentLoaded", () => {
+  initSupabase();
   initAuth();
   applyTheme();
 
-  // Login
+  // Login Events
   if ($("login-btn")) {
     $("login-btn").onclick = async () => {
       const email = $("login-email").value;
       const password = $("login-pass").value;
-      if(!email || !password) return alert("Bitte Daten eingeben.");
+      if(!email || !password) return;
       const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-      if (error) alert("Fehler: " + error.message);
+      if (error) console.error(error.message);
     };
   }
 
-  // Signup
   if ($("signup-btn")) {
     $("signup-btn").onclick = async () => {
       const email = $("login-email").value;
       const password = $("login-pass").value;
-      if(!email || !password) return alert("Bitte Daten eingeben.");
+      if(!email || !password) return;
       const { error } = await supabaseClient.auth.signUp({ email, password });
-      if (error) alert(error.message); else alert("Bestätigungs-Email gesendet!");
+      if (error) console.error(error.message);
     };
   }
 
-  // Navigation
+  // Navigation Tabs
   document.querySelectorAll(".tabbtn").forEach(btn => {
     btn.onclick = () => switchTab(btn.dataset.tab);
   });
 
-  // Date Picker
+  // Date Picker Logic
   const dateDisplay = $("date-display");
   const dateInput = $("hidden-date-input");
   if (dateDisplay && dateInput) {
@@ -137,7 +142,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // Setup Step Logic
+  // Setup Schritte
   if ($("setup-to-step-2")) $("setup-to-step-2").onclick = () => { hide($("setup-step-1")); show($("setup-step-2")); };
   if ($("setup-to-step-3")) $("setup-to-step-3").onclick = () => { hide($("setup-step-2")); show($("setup-step-3")); renderSetupTemplates(); };
 
@@ -162,7 +167,6 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // Logout
   if ($("logout-btn")) {
     $("logout-btn").onclick = async () => {
       await supabaseClient.auth.signOut();
@@ -171,22 +175,22 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // Report Nav
   if ($("report-prev")) $("report-prev").onclick = () => { state.weekOff--; renderReport(); };
   if ($("report-next")) $("report-next").onclick = () => { state.weekOff++; renderReport(); };
 });
 
-// --- CLOUD SYNC (VERBESSERT) ---
+// --- CLOUD SYNC ---
 async function saveEntry() {
   if (!currentUser || !supabaseClient) return;
   const day = state.selectedDate;
   try {
+    // Upsert ohne Rückmeldung für flüssiges Tippen
     await supabaseClient.from("day_entries").upsert({
       user_id: currentUser.id,
       day: day,
       school: getData(KEY.school, {})[day] || {},
       work: getData(KEY.work, {})[day] || { tasks: [], note: "" }
-    });
+    }, { onConflict: 'user_id, day' });
   } catch (e) {}
 }
 
@@ -198,7 +202,7 @@ async function saveConfig() {
       subjects: getData(KEY.subjects, []),
       schooldays: getData(KEY.days, [1, 2]),
       templates: getData(KEY.workTemplates, {})
-    });
+    }, { onConflict: 'user_id' });
   } catch (e) {}
 }
 
@@ -206,42 +210,33 @@ async function syncDown() {
   if (!currentUser || !supabaseClient) return;
   
   try {
-    // 1. Einträge laden
-    const { data: entries } = await supabaseClient
-      .from("day_entries")
-      .select("*")
-      .eq("user_id", currentUser.id);
+    // 1. Einträge parallel laden
+    const [entriesRes, configRes] = await Promise.all([
+      supabaseClient.from("day_entries").select("*").eq("user_id", currentUser.id),
+      supabaseClient.from("user_configs").select("*").eq("user_id", currentUser.id).maybeSingle()
+    ]);
 
-    if (entries && entries.length > 0) {
+    if (entriesRes.data && entriesRes.data.length > 0) {
       const s = getData(KEY.school, {}); 
       const w = getData(KEY.work, {});
-      entries.forEach(e => { s[e.day] = e.school; w[e.day] = e.work; });
+      entriesRes.data.forEach(e => { s[e.day] = e.school; w[e.day] = e.work; });
       setData(KEY.school, s); 
       setData(KEY.work, w);
     }
     
-    // 2. Konfiguration laden
-    const { data: config, error } = await supabaseClient
-      .from("user_configs")
-      .select("*")
-      .eq("user_id", currentUser.id)
-      .maybeSingle();
-
-    // 404 wird von maybeSingle abgefangen (data ist dann einfach null)
-    if (config) {
-      setData(KEY.subjects, config.subjects || []);
-      setData(KEY.days, config.schooldays || [1, 2]);
-      setData(KEY.workTemplates, config.templates || {});
-      if (config.subjects && config.subjects.length > 0) {
-        setData(KEY.setup, true);
-      }
+    if (configRes.data) {
+      const c = configRes.data;
+      setData(KEY.subjects, c.subjects || []);
+      setData(KEY.days, c.schooldays || [1, 2]);
+      setData(KEY.workTemplates, c.templates || {});
+      if (c.subjects && c.subjects.length > 0) setData(KEY.setup, true);
     }
   } catch (e) {
-    console.log("Sync-Hinweis: Noch keine Cloud-Daten vorhanden.");
+    console.log("Sync Hinweis: Cloud aktuell nicht erreichbar oder leer.");
   }
 }
 
-// --- UI RENDERING (REMAINDER) ---
+// --- UI RENDERING ---
 function applyTheme() {
   const dark = getData(KEY.dark, true);
   document.body.classList.toggle("light", !dark);
@@ -278,7 +273,7 @@ function renderSchool() {
   if (!list) return;
   list.innerHTML = "";
   if (!isSchoolDay()) {
-    list.innerHTML = "<div class='panel muted' style='text-align:center'>Kein Schultag.</div>";
+    list.innerHTML = "<div class='panel muted' style='text-align:center'>Kein Schultag laut Einstellungen.</div>";
     return;
   }
   const entries = getData(KEY.school, {});
@@ -286,7 +281,7 @@ function renderSchool() {
   getData(KEY.subjects, []).forEach(sub => {
     const card = document.createElement("div");
     card.className = "panel";
-    card.innerHTML = `<div class="h3">${esc(sub)}</div><textarea class="input" style="min-height:80px">${esc(dayData[sub] || "")}</textarea>`;
+    card.innerHTML = `<div class="h3">${esc(sub)}</div><textarea class="input" style="min-height:80px" placeholder="Inhalt...">${esc(dayData[sub] || "")}</textarea>`;
     card.querySelector("textarea").oninput = (e) => {
       dayData[sub] = e.target.value;
       entries[state.selectedDate] = dayData;
@@ -332,7 +327,7 @@ function renderWork() {
   
   const notePanel = document.createElement("div");
   notePanel.className = "panel";
-  notePanel.innerHTML = `<div class="h3">Notizen</div><textarea class="input">${esc(dayData.note || "")}</textarea>`;
+  notePanel.innerHTML = `<div class="h3">Notizen / Sonstiges</div><textarea class="input" placeholder="Zusätzliche Infos...">${esc(dayData.note || "")}</textarea>`;
   notePanel.querySelector("textarea").oninput = (e) => {
     dayData.note = e.target.value;
     entries[state.selectedDate] = dayData;
@@ -377,7 +372,7 @@ function renderSetup() {
 function renderReport() {
   const d = new Date(state.selectedDate);
   const mon = new Date(d.setDate(d.getDate() - (d.getDay() || 7) + 1 + (state.weekOff * 7)));
-  if ($("report-week-label")) $("report-week-label").textContent = "Bericht ab " + mon.toLocaleDateString('de-DE');
+  if ($("report-week-label")) $("report-week-label").textContent = "Woche ab " + mon.toLocaleDateString('de-DE');
   
   let sText = ""; let wSet = new Set();
   const sE = getData(KEY.school, {}); const wE = getData(KEY.work, {});
@@ -393,10 +388,8 @@ function renderReport() {
 }
 
 function renderSetupTemplates() {
-  // Vereinfacht für Setup
   const t = getData(KEY.workTemplates, {});
   if (Object.keys(t).length === 0) {
-    // Default Kategorien falls leer
     const def = {"Werkstatt": [], "Büro": [], "Service": []};
     setData(KEY.workTemplates, def);
   }

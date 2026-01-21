@@ -1,3 +1,4 @@
+
 /**
  * app.js - Vollständige Logik für Berichtsheft Pro
  * Optimierte Version zur Vermeidung von 404-Log-Fehlern und Verbindungsabbrüchen.
@@ -211,9 +212,11 @@ async function syncDown() {
   
   try {
     // 1. Einträge parallel laden
+    // .maybeSingle() kann bei 0 Treffern einen 406/404 im Log erzeugen, 
+    // daher nutzen wir .select() und prüfen die Länge manuell
     const [entriesRes, configRes] = await Promise.all([
       supabaseClient.from("day_entries").select("*").eq("user_id", currentUser.id),
-      supabaseClient.from("user_configs").select("*").eq("user_id", currentUser.id).maybeSingle()
+      supabaseClient.from("user_configs").select("*").eq("user_id", currentUser.id)
     ]);
 
     if (entriesRes.data && entriesRes.data.length > 0) {
@@ -224,8 +227,8 @@ async function syncDown() {
       setData(KEY.work, w);
     }
     
-    if (configRes.data) {
-      const c = configRes.data;
+    if (configRes.data && configRes.data.length > 0) {
+      const c = configRes.data[0];
       setData(KEY.subjects, c.subjects || []);
       setData(KEY.days, c.schooldays || [1, 2]);
       setData(KEY.workTemplates, c.templates || {});

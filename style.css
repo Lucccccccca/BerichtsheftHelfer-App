@@ -7,6 +7,7 @@
   --line: #1f2a3a;
   --acc: #6df3ff;
   --danger: #ff4d4d;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 body.light {
@@ -18,99 +19,185 @@ body.light {
   --line: #d9e1ef;
   --acc: #0aa0ff;
   --danger: #ff3b3b;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-body { margin: 0; font-family: sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; }
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+}
 
 .hidden { display: none !important; }
 
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin: 12px; }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+/* Screens */
+.screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 
-.h2 { font-size: 1.4rem; font-weight: 800; margin-bottom: 10px; }
-.h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
-.muted { color: var(--muted); font-size: 0.9rem; }
-
-.input, .textarea {
-  width: 100%;
-  background: rgba(255,255,255,0.04);
+/* Panels & Cards */
+.panel {
+  background: var(--panel);
   border: 1px solid var(--line);
-  color: var(--text);
-  padding: 12px;
-  border-radius: 10px;
-  font-size: 1rem;
-}
-body.light .input, body.light .textarea { background: #fff; color: #000; }
-
-.btn {
-  background: var(--acc) !important;
-  color: #000 !important;
-  border: none;
-  padding: 12px;
-  border-radius: 10px;
-  font-weight: 700;
-  cursor: pointer;
-  width: 100%;
-}
-.btn-ghost {
-  background: transparent !important;
-  color: var(--text) !important;
-  border: 1px solid var(--line) !important;
-}
-.btn-danger {
-  background: var(--danger) !important;
-  color: #fff !important;
+  border-radius: 16px;
+  padding: 20px;
+  margin: 0 14px 14px 14px;
+  box-shadow: var(--shadow);
 }
 
+/* Topbar */
 .topbar {
-  position: sticky; top: 0; z-index: 100;
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 16px;
-  background: var(--panel);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  padding: 16px;
   border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(10px);
 }
-.btn-icon { background: transparent !important; border: none !important; color: var(--text); font-size: 1.4rem; cursor: pointer; }
 
-.tabs {
-  position: fixed; bottom: 0; width: 100%;
-  display: grid; grid-template-columns: repeat(5, 1fr);
-  background: var(--panel);
-  border-top: 1px solid var(--line);
-  padding-bottom: env(safe-area-inset-bottom);
-}
-.tabbtn {
-  background: transparent !important;
-  border: none;
-  color: var(--muted);
-  padding: 14px 4px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-.tabbtn.active { color: var(--acc) !important; border-top: 3px solid var(--acc); }
+/* Typography */
+.h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: 8px; }
+.h3 { font-size: 1rem; font-weight: 700; margin-bottom: 12px; color: var(--acc); }
+.muted { color: var(--muted); font-size: 0.9rem; line-height: 1.4; }
 
-.chip {
-  background: var(--line);
-  color: var(--text);
-  padding: 8px 12px;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  margin: 4px;
-  display: inline-block;
-}
-.chip.active { background: var(--acc); color: #000; }
-
-.weekday {
-  aspect-ratio: 1;
+/* Form Elements */
+.input, .select {
+  width: 100%;
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  color: var(--text);
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.input:focus { border-color: var(--acc); }
+
+.btn {
+  width: 100%;
+  background: var(--acc);
+  color: #000;
+  border: none;
+  padding: 14px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.btn:active { transform: scale(0.98); }
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+.btn-danger {
+  background: var(--danger);
+  color: white;
+}
+
+/* Tabs Navigation */
+.tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 70px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 1000;
+}
+
+.tabbtn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex: 1;
+  padding: 8px 0;
+  transition: color 0.2s;
+}
+
+.tabbtn.active {
+  color: var(--acc);
+}
+
+.tabbtn svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+
+/* Chips */
+.chip-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.chip.active {
+  background: var(--acc);
+  color: #000;
+  border-color: var(--acc);
+}
+
+/* Weekday Buttons */
+.weekday {
+  aspect-ratio: 1;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
   color: var(--text);
   font-weight: 700;
   cursor: pointer;
 }
-.weekday.active { background: var(--acc); color: #000; }
 
-.content { padding-bottom: 100px; }
+.weekday.active {
+  background: var(--acc);
+  color: #000;
+  border-color: var(--acc);
+}
+
+/* Print Styles */
+@media print {
+  .tabs, .topbar, .btn, .btn-ghost { display: none !important; }
+  body { background: white; color: black; }
+  .panel { border: none; box-shadow: none; margin: 0; padding: 0; }
+  .input { border: none; padding: 0; }
+}

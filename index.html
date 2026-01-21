@@ -4,72 +4,100 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>Berichtsheft App</title>
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#0b0f16" />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
 
   <div id="login-screen" class="screen">
-    <div class="panel" style="max-width:400px;margin:15vh auto;">
+    <div class="panel" style="max-width:520px;margin:40px auto;">
       <div class="h2">Login</div>
-      <input id="login-email" class="input" type="email" placeholder="E-Mail" />
-      <input id="login-pass" class="input" type="password" placeholder="Passwort" />
-      <button id="login-btn" class="btn" style="margin-top:15px;">Einloggen</button>
-      <button id="signup-btn" class="btn btn-ghost" style="margin-top:10px;">Registrieren</button>
+      <div class="muted">Cloud-Synchronisierung aktiv.</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:15px;">
+        <input id="login-email" class="input" type="email" placeholder="E-Mail" />
+        <input id="login-pass" class="input" type="password" placeholder="Passwort" />
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button id="login-btn" class="btn" type="button">Einloggen</button>
+        <button id="signup-btn" class="btn btn-ghost" type="button">Registrieren</button>
+      </div>
     </div>
   </div>
 
   <div id="setup-screen" class="screen hidden">
-    <div class="panel">
+    <div class="panel" style="max-width:520px;margin:40px auto;">
+      <div class="h2">Setup</div>
       <div id="setup-step-1">
-        <h3>Fächer hinzufügen</h3>
-        <input id="setup-subject-input" class="input" placeholder="Fach-Name" />
-        <button id="setup-add-subject" class="btn">Hinzufügen</button>
-        <div id="setup-subject-list" style="margin-top:15px;"></div>
+        <p>Deine Schulfächer:</p>
+        <div style="display:flex;gap:8px;">
+          <input id="setup-subject-input" class="input" placeholder="z.B. Deutsch" />
+          <button id="setup-add-subject" class="btn" style="width:auto;">+</button>
+        </div>
+        <div id="setup-subject-list" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:5px;"></div>
         <button onclick="document.getElementById('setup-step-1').classList.add('hidden');document.getElementById('setup-step-2').classList.remove('hidden')" class="btn" style="margin-top:20px;">Weiter</button>
       </div>
       <div id="setup-step-2" class="hidden">
-        <h3>Schultage wählen</h3>
+        <p>Deine Schultage:</p>
         <div id="setup-schooldays" style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;"></div>
-        <button id="setup-finish" class="btn" style="margin-top:20px;">App starten</button>
+        <button id="setup-finish" class="btn" style="margin-top:20px;">Einrichtung fertig</button>
       </div>
     </div>
   </div>
 
   <div id="app-screen" class="screen hidden">
     <div class="topbar">
-      <div style="position:relative;">
-        <button class="btn-icon">📅</button>
-        <input type="date" id="hidden-date-input" style="position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer;">
+      <div style="position:relative; width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
+        <span style="font-size:1.5rem;">📅</span>
+        <input type="date" id="hidden-date-input" style="position:absolute; opacity:0; left:0; top:0; width:100%; height:100%; cursor:pointer;">
       </div>
-      <div id="topbar-title" class="topbar-title">Datum</div>
-      <button id="open-settings" class="btn-icon">⚙️</button>
+      
+      <div id="topbar-title" class="topbar-title">Wird geladen...</div>
+      
+      <button id="open-settings" class="btn-icon" type="button">⚙️</button>
     </div>
 
     <div class="content">
-      <div id="tab-school" class="tab-content hidden"><div id="school-list"></div></div>
+      <div id="tab-day" class="tab-content hidden">
+         <div class="panel"><div class="h3">Tagesübersicht</div><p id="day-info">Wähle ein Datum.</p></div>
+      </div>
+      
+      <div id="tab-school" class="tab-content hidden">
+        <div id="school-list"></div>
+      </div>
+
       <div id="tab-work" class="tab-content hidden">
         <div id="work-list"></div>
-        <textarea id="work-note" class="textarea" placeholder="Notizen..."></textarea>
+        <div class="panel"><textarea id="work-note" class="textarea" placeholder="Allgemeine Notizen..."></textarea></div>
       </div>
+
       <div id="tab-report" class="tab-content hidden">
-        <div class="panel" style="display:flex;justify-content:space-between;">
+        <div class="panel" style="display:flex; justify-content:space-between; align-items:center;">
           <button id="report-prev" class="btn-icon">◀</button>
-          <div id="report-week">Woche</div>
+          <div id="report-week-label" style="font-weight:bold;">Woche</div>
           <button id="report-next" class="btn-icon">▶</button>
         </div>
         <div class="panel">
-          <textarea id="report-draft-school" class="textarea" style="height:150px" readonly></textarea>
-          <textarea id="report-draft-work" class="textarea" style="height:100px" readonly></textarea>
+          <textarea id="report-draft-school" class="textarea" style="height:120px;margin-bottom:10px;" readonly></textarea>
+          <textarea id="report-draft-work" class="textarea" style="height:100px;" readonly></textarea>
         </div>
       </div>
+
       <div id="tab-settings" class="tab-content hidden">
-        <div class="panel"><label><input type="checkbox" id="dark-toggle"> Dark Mode</label></div>
-        <div class="panel"><button id="reset-all" class="btn btn-danger">Lokale Daten löschen</button></div>
+        <div class="panel">
+          <div class="h3">Einstellungen</div>
+          <label style="display:flex;align-items:center;gap:10px;">
+            <input type="checkbox" id="dark-toggle"> Dark Mode
+          </label>
+        </div>
+        <div class="panel">
+          <button id="reset-all" class="btn btn-danger">Lokale Daten löschen</button>
+        </div>
       </div>
     </div>
 
     <div class="tabs">
-      <button class="tabbtn" data-tab="school">Schule</button>
+      <button class="tabbtn active" data-tab="school">Schule</button>
       <button class="tabbtn" data-tab="work">Arbeit</button>
       <button class="tabbtn" data-tab="report">Bericht</button>
     </div>

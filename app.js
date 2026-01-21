@@ -194,7 +194,7 @@ async function saveEntry() {
 async function saveConfig() {
   if (!currentUser || !supabaseClient) return;
   try {
-    await supabaseClient.from("user_configs").upsert({
+    await supabaseClient.from("user_config").upsert({
       user_id: currentUser.id,
       subjects: getData(KEY.subjects, []),
       schooldays: getData(KEY.days, [1, 2]),
@@ -209,7 +209,7 @@ async function syncDown() {
   try {
     const [entriesRes, configRes] = await Promise.all([
       supabaseClient.from("day_entries").select("*").eq("user_id", currentUser.id),
-      supabaseClient.from("user_configs").select("*").eq("user_id", currentUser.id)
+      supabaseClient.from("user_config").select("*").eq("user_id", currentUser.id)
     ]);
 
     // Falls Einträge da sind, lokal speichern

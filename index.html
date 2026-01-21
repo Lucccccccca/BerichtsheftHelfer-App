@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>Berichtsheft Pro</title>
-
   <link rel="manifest" href="./manifest.json" />
   <meta name="theme-color" content="#0b0f16" />
   <link rel="stylesheet" href="./style.css" />
@@ -16,7 +15,6 @@
     <div class="panel" style="max-width:400px; margin:60px auto;">
       <div class="h2">Anmelden</div>
       <div class="muted" style="margin-bottom:20px;">Deine Daten werden sicher in der Cloud gespeichert.</div>
-
       <div style="display:flex; flex-direction:column; gap:12px;">
         <input id="login-email" class="input" type="email" placeholder="E-Mail" />
         <input id="login-pass" class="input" type="password" placeholder="Passwort" />
@@ -50,19 +48,20 @@
         <button id="setup-to-step-3" class="btn">Weiter</button>
       </div>
 
-      <!-- Schritt 3: Tätigkeiten -->
+      <!-- Schritt 3: Bereiche & Aufgaben -->
       <div id="setup-step-3" class="hidden">
-        <div class="h2">Arbeitstätigkeiten</div>
-        <p class="muted">Erstelle Kategorien und Standard-Aufgaben.</p>
+        <div class="h2">Arbeitsbereiche</div>
+        <p class="muted">Erstelle Kategorien (z.B. Verkauf) und Aufgaben.</p>
+        
         <div style="display:flex; gap:8px; margin-bottom:10px;">
-          <input id="setup-category-input" class="input" placeholder="Neue Kategorie..." />
-          <button id="setup-add-category" class="btn" style="width:auto">＋</button>
+          <input id="setup-category-input" class="input" placeholder="Neuer Bereich..." />
+          <button id="setup-add-category" class="btn" style="width:auto">Bereich +</button>
         </div>
         
         <div style="margin-top:15px; padding-top:15px; border-top:1px solid var(--line);">
           <select id="setup-category-select" class="select"></select>
           <div style="display:flex; gap:8px; margin-top:10px;">
-            <input id="setup-task-input" class="input" placeholder="Tätigkeit hinzufügen..." />
+            <input id="setup-task-input" class="input" placeholder="Aufgabe hinzufügen..." />
             <button id="setup-add-task" class="btn" style="width:auto">＋</button>
           </div>
           <div id="setup-task-list" style="margin-top:15px; max-height:200px; overflow-y:auto;"></div>
@@ -83,9 +82,9 @@
       </div>
     </div>
 
-    <div class="content" style="padding-bottom: 80px;">
+    <div class="content" style="padding-bottom: 90px;">
       
-      <!-- Tag Tab -->
+      <!-- Tag Tab (Inhalte Schule/Arbeit) -->
       <div id="tab-day" class="tab-content day-content">
         <div id="school-list"></div>
         <div id="work-list"></div>
@@ -115,7 +114,17 @@
       <!-- Settings Tab -->
       <div id="tab-settings" class="tab-content settings-content hidden">
         <div class="panel">
-          <div class="h2">Einstellungen</div>
+          <div class="h2">Bereiche verwalten</div>
+          <p class="muted">Füge neue Arbeitsbereiche hinzu oder lösche Aufgaben.</p>
+          
+          <div style="display:flex; gap:8px; margin-bottom:15px;">
+            <input id="settings-category-input" class="input" placeholder="Neuer Bereich..." />
+            <button id="settings-add-category" class="btn" style="width:auto">Bereich +</button>
+          </div>
+
+          <hr style="border:0; border-top:1px solid var(--line); margin:20px 0;">
+
+          <div class="h3">Aufgaben in Bereich</div>
           <select id="settings-category-select" class="select"></select>
           <div style="display:flex; gap:8px; margin-top:10px;">
             <input id="settings-task-input" class="input" placeholder="Neue Aufgabe..." />
@@ -132,11 +141,20 @@
 
     </div>
 
-    <!-- Navigation -->
+    <!-- Navigationleiste mit Icons (Nur Tag, Report, Settings) -->
     <div class="tabs">
-      <button class="tabbtn active" data-tab="day">Tag</button>
-      <button class="tabbtn" data-tab="report">Report</button>
-      <button class="tabbtn" data-tab="settings">Settings</button>
+      <button class="tabbtn active" data-tab="day">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+        <span>Tag</span>
+      </button>
+      <button class="tabbtn" data-tab="report">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+        <span>Report</span>
+      </button>
+      <button class="tabbtn" data-tab="settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span>Settings</span>
+      </button>
     </div>
   </div>
 

@@ -1,6 +1,6 @@
 /**
  * app.js - Vollständige Logik für Berichtsheft Pro
- * Synchronisiert mit der neuesten index.html (inkl. Settings, Cloud-Sync & Inline-Edit)
+ * Inklusive Bereichs-Management (Kategorien hinzufügen/löschen)
  */
 
 // --- KONFIGURATION ---
@@ -51,7 +51,6 @@ function handleUser(user) {
     hide($("app-screen"));
   } else {
     hide($("login-screen"));
-    // Falls Setup noch nie gemacht wurde
     if (!getData(KEY.setup, false)) {
       show($("setup-screen"));
       renderSetup();
@@ -59,7 +58,6 @@ function handleUser(user) {
       show($("app-screen"));
       syncDown().then(() => {
         renderAll();
-        // Start-Tab je nach Tag (Tag-Ansicht als Standard)
         switchTab("day");
       });
     }
@@ -71,7 +69,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initAuth();
   applyTheme();
 
-  // Login & Signup Buttons
+  // Login & Signup
   if ($("login-btn")) {
     $("login-btn").onclick = async () => {
       const email = $("login-email").value;
@@ -86,16 +84,16 @@ document.addEventListener("DOMContentLoaded", () => {
       const email = $("login-email").value;
       const password = $("login-pass").value;
       const { error } = await supabaseClient.auth.signUp({ email, password });
-      if (error) alert(error.message); else alert("Check dein E-Mail Postfach!");
+      if (error) alert(error.message); else alert("Bitte E-Mails prüfen!");
     };
   }
 
-  // Navigation (Tabs)
+  // Navigation
   document.querySelectorAll(".tabbtn").forEach(btn => {
     btn.onclick = () => switchTab(btn.dataset.tab);
   });
 
-  // Date Picker Logic
+  // Date Picker
   const dateDisplay = $("date-display");
   const dateInput = $("hidden-date-input");
   if (dateDisplay && dateInput) {
@@ -124,15 +122,18 @@ document.addEventListener("DOMContentLoaded", () => {
   if ($("setup-to-step-2")) $("setup-to-step-2").onclick = () => { hide($("setup-step-1")); show($("setup-step-2")); };
   if ($("setup-to-step-3")) $("setup-to-step-3").onclick = () => { hide($("setup-step-2")); show($("setup-step-3")); renderSetupTemplates(); };
 
+  // Setup: Bereich hinzufügen
   if ($("setup-add-category")) {
     $("setup-add-category").onclick = () => {
       const cat = $("setup-category-input").value.trim();
       if (cat) {
         const t = getData(KEY.workTemplates, {});
-        if (!t[cat]) t[cat] = [];
-        setData(KEY.workTemplates, t);
-        $("setup-category-input").value = "";
-        renderSetupTemplates();
+        if (!t[cat]) {
+          t[cat] = [];
+          setData(KEY.workTemplates, t);
+          $("setup-category-input").value = "";
+          renderSetupTemplates();
+        }
       }
     };
   }
@@ -159,11 +160,24 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // Wochenbericht Navigation
-  if ($("report-prev")) $("report-prev").onclick = () => { state.weekOff--; renderReport(); };
-  if ($("report-next")) $("report-next").onclick = () => { state.weekOff++; renderReport(); };
+  // --- SETTINGS LOGIK ---
+  // Bereich hinzufügen in Settings
+  if ($("settings-add-category")) {
+    $("settings-add-category").onclick = () => {
+      const cat = $("settings-category-input").value.trim();
+      if (cat) {
+        const t = getData(KEY.workTemplates, {});
+        if (!t[cat]) {
+          t[cat] = [];
+          setData(KEY.workTemplates, t);
+          $("settings-category-input").value = "";
+          renderSettingsTemplates();
+          saveConfig();
+        }
+      }
+    };
+  }
 
-  // Settings Logik (Pendants zu den Setup-Funktionen für den Settings-Tab)
   if ($("settings-add-task")) {
     $("settings-add-task").onclick = () => {
       const cat = $("settings-category-select").value;
@@ -189,35 +203,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if ($("reset-all")) {
     $("reset-all").onclick = () => {
-      if (confirm("Möchtest du wirklich alle Daten löschen? Dies kann nicht rückgängig gemacht werden.")) {
+      if (confirm("Alles löschen?")) {
         localStorage.clear();
         location.reload();
       }
     };
   }
+
+  // Wochenbericht Navigation
+  if ($("report-prev")) $("report-prev").onclick = () => { state.weekOff--; renderReport(); };
+  if ($("report-next")) $("report-next").onclick = () => { state.weekOff++; renderReport(); };
 });
 
-// --- CORE RENDERING ---
+// --- RENDERING ---
 function applyTheme() {
   const dark = getData(KEY.dark, true);
   document.body.classList.toggle("light", !dark);
 }
 
-function isSchoolDay() {
-  const d = new Date(state.selectedDate).getDay();
-  const schoolDays = getData(KEY.days, [1, 2]); 
-  return schoolDays.includes(d);
+function updateTopbar() {
+  const d = new Date(state.selectedDate);
+  const opt = { weekday: 'short', day: '2-digit', month: '2-digit' };
+  if ($("date-display")) $("date-display").textContent = d.toLocaleDateString('de-DE', opt);
 }
 
 function switchTab(t) {
-  // Verstecke alle Content-Bereiche
   document.querySelectorAll(".tab-content").forEach(c => hide(c));
-  
-  // Zeige Ziel-Tab (Suche nach Klasse oder ID passend zur index.html)
-  const target = document.querySelector("." + t + "-content") || $("tab-" + t);
+  const target = $("tab-" + t);
   if (target) show(target);
 
-  // Buttons updaten
   document.querySelectorAll(".tabbtn").forEach(b => {
     b.classList.toggle("active", b.dataset.tab === t);
   });
@@ -225,15 +239,12 @@ function switchTab(t) {
   if (t === "report") renderReport();
   if (t === "settings") renderSettingsTemplates();
   if (t === "day") renderAll();
-  
   updateTopbar();
 }
 
-function updateTopbar() {
-  const d = new Date(state.selectedDate);
-  const opt = { weekday: 'short', day: '2-digit', month: '2-digit' };
-  const titleEl = $("date-display");
-  if (titleEl) titleEl.textContent = d.toLocaleDateString('de-DE', opt);
+function isSchoolDay() {
+  const d = new Date(state.selectedDate).getDay();
+  return getData(KEY.days, [1, 2]).includes(d);
 }
 
 function renderAll() {
@@ -245,24 +256,16 @@ function renderSchool() {
   const list = $("school-list");
   if (!list) return;
   list.innerHTML = "";
-
   if (!isSchoolDay()) {
-    list.innerHTML = "<div class='panel muted' style='text-align:center'>Heute ist kein Schultag laut deinen Einstellungen.</div>";
+    list.innerHTML = "<div class='panel muted' style='text-align:center'>Kein Schultag.</div>";
     return;
   }
-
   const entries = getData(KEY.school, {});
   const dayData = entries[state.selectedDate] || {};
-  const subjects = getData(KEY.subjects, []);
-
-  subjects.forEach(sub => {
+  getData(KEY.subjects, []).forEach(sub => {
     const card = document.createElement("div");
     card.className = "panel";
-    card.style.marginBottom = "12px";
-    card.innerHTML = `
-      <div class="h3" style="margin-bottom:8px">${esc(sub)}</div>
-      <textarea class="input" style="min-height:80px" placeholder="Lerninhalte eintragen...">${esc(dayData[sub] || "")}</textarea>
-    `;
+    card.innerHTML = `<div class="h3">${esc(sub)}</div><textarea class="input" style="min-height:80px">${esc(dayData[sub] || "")}</textarea>`;
     card.querySelector("textarea").oninput = (e) => {
       dayData[sub] = e.target.value;
       entries[state.selectedDate] = dayData;
@@ -277,38 +280,31 @@ function renderWork() {
   const list = $("work-list");
   if (!list) return;
   list.innerHTML = "";
-
   if (isSchoolDay()) {
-    list.innerHTML = "<div class='panel muted' style='text-align:center'>Heute ist Berufsschule. Wechsle zum Schule-Tab.</div>";
+    list.innerHTML = "<div class='panel muted' style='text-align:center'>Heute ist Berufsschule.</div>";
     return;
   }
-
   const entries = getData(KEY.work, {});
   const dayData = entries[state.selectedDate] || { tasks: [], note: "" };
-  const temps = getData(KEY.workTemplates, { "Allgemein": ["Kundenberatung"] });
+  const temps = getData(KEY.workTemplates, {});
 
   Object.keys(temps).forEach(cat => {
     const card = document.createElement("div");
     card.className = "panel";
-    card.style.marginBottom = "12px";
     card.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <div class="h3" style="margin:0;">${esc(cat)}</div>
+        <div class="h3">${esc(cat)}</div>
         <button class="btn-ghost" style="width:auto; padding:4px 8px" onclick="addInlineTask('${esc(cat)}')">＋</button>
       </div>
-      <div class="chip-container" id="chips-${esc(cat)}" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+      <div class="chip-container"></div>
     `;
-    const cont = card.querySelector(`#chips-${cat}`);
+    const cont = card.querySelector(".chip-container");
     temps[cat].forEach(t => {
       const chip = document.createElement("div");
       chip.className = "chip" + (dayData.tasks.includes(t) ? " active" : "");
       chip.textContent = t;
       chip.onclick = () => {
-        if (dayData.tasks.includes(t)) {
-          dayData.tasks = dayData.tasks.filter(x => x !== t);
-        } else {
-          dayData.tasks.push(t);
-        }
+        dayData.tasks = dayData.tasks.includes(t) ? dayData.tasks.filter(x => x !== t) : [...dayData.tasks, t];
         entries[state.selectedDate] = dayData;
         setData(KEY.work, entries);
         renderWork();
@@ -319,22 +315,20 @@ function renderWork() {
     list.appendChild(card);
   });
   
-  // Notizen
   const notePanel = document.createElement("div");
   notePanel.className = "panel";
-  notePanel.innerHTML = `<div class="h3">Zusätzliche Notizen</div><textarea class="input" style="min-height:80px">${esc(dayData.note || "")}</textarea>`;
-  list.appendChild(notePanel);
-  
+  notePanel.innerHTML = `<div class="h3">Zusätzliche Notizen</div><textarea class="input">${esc(dayData.note || "")}</textarea>`;
   notePanel.querySelector("textarea").oninput = (e) => {
     dayData.note = e.target.value;
     entries[state.selectedDate] = dayData;
     setData(KEY.work, entries);
     saveEntry();
   };
+  list.appendChild(notePanel);
 }
 
 window.addInlineTask = (cat) => {
-  const t = prompt("Neue Tätigkeit für '" + cat + "':");
+  const t = prompt("Neue Aufgabe für '" + cat + "':");
   if (t && t.trim()) {
     const temps = getData(KEY.workTemplates, {});
     temps[cat].push(t.trim());
@@ -344,66 +338,7 @@ window.addInlineTask = (cat) => {
   }
 };
 
-function renderReport() {
-  const d = new Date(state.selectedDate);
-  const mon = new Date(d.setDate(d.getDate() - (d.getDay() || 7) + 1 + (state.weekOff * 7)));
-  
-  const label = $("report-week-label");
-  if (label) label.textContent = "Berichtswoche ab " + mon.toLocaleDateString('de-DE');
-  
-  let sText = "";
-  let wSet = new Set();
-  const sE = getData(KEY.school, {});
-  const wE = getData(KEY.work, {});
-  
-  for (let i = 0; i < 5; i++) {
-    const cur = new Date(mon);
-    cur.setDate(cur.getDate() + i);
-    const iso = cur.toISOString().split("T")[0];
-    
-    if (sE[iso]) {
-      Object.entries(sE[iso]).forEach(([k, v]) => { if (v) sText += k + ": " + v + "\n"; });
-    }
-    if (wE[iso] && wE[iso].tasks) {
-      wE[iso].tasks.forEach(t => wSet.add(t));
-    }
-  }
-  
-  if ($("report-draft-school")) $("report-draft-school").value = sText.trim();
-  if ($("report-draft-work")) $("report-draft-work").value = Array.from(wSet).join(", ");
-}
-
-// --- SETUP & SETTINGS RENDERERS ---
-function renderSetup() {
-  const list = $("setup-subject-list");
-  if (!list) return;
-  list.innerHTML = "";
-  getData(KEY.subjects, []).forEach(s => {
-    const c = document.createElement("div");
-    c.className = "chip active";
-    c.textContent = s;
-    list.appendChild(c);
-  });
-
-  const grid = $("setup-schooldays");
-  if (!grid) return;
-  grid.innerHTML = "";
-  const names = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
-  const selDays = getData(KEY.days, [1, 2]);
-  names.forEach((n, i) => {
-    const b = document.createElement("button");
-    b.className = "weekday" + (selDays.includes(i) ? " active" : "");
-    b.textContent = n;
-    b.onclick = () => {
-      let d = getData(KEY.days, [1, 2]);
-      d = d.includes(i) ? d.filter(x => x !== i) : [...d, i];
-      setData(KEY.days, d);
-      renderSetup();
-    };
-    grid.appendChild(b);
-  });
-}
-
+// --- RENDER HELPERS ---
 function renderSetupTemplates() {
   const t = getData(KEY.workTemplates, {});
   const sel = $("setup-category-select");
@@ -437,7 +372,6 @@ function renderSetupTemplatesTaskList(cat) {
   });
 }
 
-// Settings Renderer (gleiches Prinzip wie Setup, nur für den Settings Tab)
 function renderSettingsTemplates() {
   const t = getData(KEY.workTemplates, {});
   const sel = $("settings-category-select");
@@ -457,6 +391,22 @@ function renderSettingsTaskList(cat) {
   if (!list) return;
   list.innerHTML = "";
   const t = getData(KEY.workTemplates, {});
+  
+  // Lösch-Button für den gesamten Bereich
+  const delCatBtn = document.createElement("button");
+  delCatBtn.className = "btn btn-danger";
+  delCatBtn.style = "margin-bottom: 15px; font-size: 0.8rem; padding: 8px;";
+  delCatBtn.textContent = "Gesamten Bereich '" + cat + "' löschen";
+  delCatBtn.onclick = () => {
+    if(confirm("Diesen Bereich wirklich entfernen?")) {
+      delete t[cat];
+      setData(KEY.workTemplates, t);
+      renderSettingsTemplates();
+      saveConfig();
+    }
+  };
+  list.appendChild(delCatBtn);
+
   (t[cat] || []).forEach(x => {
     const r = document.createElement("div");
     r.className = "list-row";
@@ -472,7 +422,55 @@ function renderSettingsTaskList(cat) {
   });
 }
 
-// --- SYNC ENGINE ---
+function renderReport() {
+  const d = new Date(state.selectedDate);
+  const mon = new Date(d.setDate(d.getDate() - (d.getDay() || 7) + 1 + (state.weekOff * 7)));
+  if ($("report-week-label")) $("report-week-label").textContent = "Bericht ab " + mon.toLocaleDateString('de-DE');
+  
+  let sText = ""; let wSet = new Set();
+  const sE = getData(KEY.school, {}); const wE = getData(KEY.work, {});
+  
+  for (let i = 0; i < 5; i++) {
+    const cur = new Date(mon); cur.setDate(cur.getDate() + i);
+    const iso = cur.toISOString().split("T")[0];
+    if (sE[iso]) Object.entries(sE[iso]).forEach(([k, v]) => { if (v) sText += k + ": " + v + "\n"; });
+    if (wE[iso]?.tasks) wE[iso].tasks.forEach(t => wSet.add(t));
+  }
+  if ($("report-draft-school")) $("report-draft-school").value = sText.trim();
+  if ($("report-draft-work")) $("report-draft-work").value = Array.from(wSet).join(", ");
+}
+
+function renderSetup() {
+  const list = $("setup-subject-list");
+  if (!list) return;
+  list.innerHTML = "";
+  getData(KEY.subjects, []).forEach(s => {
+    const c = document.createElement("div");
+    c.className = "chip active";
+    c.textContent = s;
+    list.appendChild(c);
+  });
+
+  const grid = $("setup-schooldays");
+  if (!grid) return;
+  grid.innerHTML = "";
+  const names = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  const selDays = getData(KEY.days, [1, 2]);
+  names.forEach((n, i) => {
+    const b = document.createElement("button");
+    b.className = "weekday" + (selDays.includes(i) ? " active" : "");
+    b.textContent = n;
+    b.onclick = () => {
+      let d = getData(KEY.days, [1, 2]);
+      d = d.includes(i) ? d.filter(x => x !== i) : [...d, i];
+      setData(KEY.days, d);
+      renderSetup();
+    };
+    grid.appendChild(b);
+  });
+}
+
+// --- CLOUD SYNC ---
 async function saveEntry() {
   if (!currentUser) return;
   const day = state.selectedDate;
@@ -498,8 +496,7 @@ async function syncDown() {
   if (!currentUser) return;
   const { data: entries } = await supabaseClient.from("day_entries").select("*").eq("user_id", currentUser.id);
   if (entries) {
-    const s = getData(KEY.school, {});
-    const w = getData(KEY.work, {});
+    const s = getData(KEY.school, {}); const w = getData(KEY.work, {});
     entries.forEach(e => { s[e.day] = e.school; w[e.day] = e.work; });
     setData(KEY.school, s); setData(KEY.work, w);
   }

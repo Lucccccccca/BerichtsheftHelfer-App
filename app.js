@@ -10,7 +10,11 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 // Sicherstellen, dass supabase geladen ist, bevor der Client erstellt wird
 let supabaseClient;
 try {
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  if (window.supabase) {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  } else {
+    console.error("Supabase Library nicht gefunden! Bitte Internetverbindung prüfen.");
+  }
 } catch (e) {
   console.error("Supabase konnte nicht initialisiert werden:", e);
 }
@@ -56,12 +60,16 @@ const esc = (t) => {
 async function initAuth() {
   if (!supabaseClient) return;
   
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  handleUser(session?.user || null);
-
-  supabaseClient.auth.onAuthStateChange((_event, session) => {
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
     handleUser(session?.user || null);
-  });
+
+    supabaseClient.auth.onAuthStateChange((_event, session) => {
+      handleUser(session?.user || null);
+    });
+  } catch (err) {
+    console.error("Auth Session Error:", err);
+  }
 }
 
 function handleUser(user) {
@@ -504,23 +512,27 @@ function renderSetup() {
 // --- CLOUD SYNC ---
 async function saveEntry() {
   if (!currentUser || !supabaseClient) return;
-  const day = state.selectedDate;
-  await supabaseClient.from("day_entries").upsert({
-    user_id: currentUser.id,
-    day: day,
-    school: getData(KEY.school, {})[day] || {},
-    work: getData(KEY.work, {})[day] || { tasks: [], note: "" }
-  });
+  try {
+    const day = state.selectedDate;
+    await supabaseClient.from("day_entries").upsert({
+      user_id: currentUser.id,
+      day: day,
+      school: getData(KEY.school, {})[day] || {},
+      work: getData(KEY.work, {})[day] || { tasks: [], note: "" }
+    });
+  } catch (e) { console.error("SaveEntry Error:", e); }
 }
 
 async function saveConfig() {
   if (!currentUser || !supabaseClient) return;
-  await supabaseClient.from("user_configs").upsert({
-    user_id: currentUser.id,
-    subjects: getData(KEY.subjects, []),
-    schooldays: getData(KEY.days, [1, 2]),
-    templates: getData(KEY.workTemplates, {})
-  });
+  try {
+    await supabaseClient.from("user_configs").upsert({
+      user_id: currentUser.id,
+      subjects: getData(KEY.subjects, []),
+      schooldays: getData(KEY.days, [1, 2]),
+      templates: getData(KEY.workTemplates, {})
+    });
+  } catch (e) { console.error("SaveConfig Error:", e); }
 }
 
 async function syncDown() {
@@ -528,7 +540,7 @@ async function syncDown() {
   
   try {
     const { data: entries, error: e1 } = await supabaseClient.from("day_entries").select("*").eq("user_id", currentUser.id);
-    if (!e1 && entries) {
+    if (!e1 && entries && entries.length > 0) {
       const s = getData(KEY.school, {}); const w = getData(KEY.work, {});
       entries.forEach(e => { s[e.day] = e.school; w[e.day] = e.work; });
       setData(KEY.school, s); setData(KEY.work, w);
@@ -539,6 +551,7 @@ async function syncDown() {
       setData(KEY.subjects, config.subjects || []);
       setData(KEY.days, config.schooldays || [1, 2]);
       setData(KEY.workTemplates, config.templates || {});
+      if (config.subjects?.length > 0) setData(KEY.setup, true);
     }
   } catch (e) {
     console.error("Fehler beim SyncDown:", e);

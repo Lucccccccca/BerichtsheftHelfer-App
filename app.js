@@ -1,7 +1,6 @@
 /**
  * app.js - Vollständige Logik für Berichtsheft Pro
- * Optimierte Version zur Vermeidung von 404-Log-Fehlern und Verbindungsabbrüchen.
- * Enthält Fehler-Resilienz gegen Browser-Extension-Konflikte.
+ * Final korrigierte Version: Stabile Synchronisation und UI-Refresh nach Daten-Download.
  */
 
 // --- KONFIGURATION ---
@@ -10,17 +9,16 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 let supabaseClient = null;
 
-// Robuste Initialisierung des Clients
+// Initialisierung des Clients
 function initSupabase() {
   try {
     if (window.supabase) {
       supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     } else {
-      console.warn("Supabase CDN noch nicht bereit, warte kurz...");
       setTimeout(initSupabase, 500);
     }
   } catch (e) {
-    console.error("Kritischer Initialisierungsfehler:", e);
+    console.error("Supabase Init Fehler:", e);
   }
 }
 
@@ -72,7 +70,7 @@ async function initAuth() {
       handleUser(session?.user || null);
     });
   } catch (err) {
-    console.log("Session-Check übersprungen oder offline.");
+    console.log("Auth Fehler oder Offline.");
   }
 }
 
@@ -84,14 +82,16 @@ function handleUser(user) {
     hide($("app-screen"));
   } else {
     hide($("login-screen"));
-    // Erst schauen ob Cloud-Daten da sind, dann entscheiden ob Setup oder App
-    syncDown().finally(() => {
-      if (!getData(KEY.setup, false)) {
+    // Erst Daten laden, dann UI entscheiden
+    syncDown().then(() => {
+      const isSetupDone = getData(KEY.setup, false);
+      if (!isSetupDone) {
         show($("setup-screen"));
         renderSetup();
       } else {
         show($("app-screen"));
         renderAll();
+        updateTopbar();
         switchTab("day");
       }
     });
@@ -104,14 +104,13 @@ document.addEventListener("DOMContentLoaded", () => {
   initAuth();
   applyTheme();
 
-  // Login Events
+  // Login/Signup
   if ($("login-btn")) {
     $("login-btn").onclick = async () => {
       const email = $("login-email").value;
       const password = $("login-pass").value;
       if(!email || !password) return;
-      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-      if (error) console.error(error.message);
+      await supabaseClient.auth.signInWithPassword({ email, password });
     };
   }
 
@@ -120,17 +119,16 @@ document.addEventListener("DOMContentLoaded", () => {
       const email = $("login-email").value;
       const password = $("login-pass").value;
       if(!email || !password) return;
-      const { error } = await supabaseClient.auth.signUp({ email, password });
-      if (error) console.error(error.message);
+      await supabaseClient.auth.signUp({ email, password });
     };
   }
 
-  // Navigation Tabs
+  // Navigation
   document.querySelectorAll(".tabbtn").forEach(btn => {
     btn.onclick = () => switchTab(btn.dataset.tab);
   });
 
-  // Date Picker Logic
+  // Date Picker
   const dateDisplay = $("date-display");
   const dateInput = $("hidden-date-input");
   if (dateDisplay && dateInput) {
@@ -142,9 +140,9 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // Setup Schritte
+  // Setup Workflow
   if ($("setup-to-step-2")) $("setup-to-step-2").onclick = () => { hide($("setup-step-1")); show($("setup-step-2")); };
-  if ($("setup-to-step-3")) $("setup-to-step-3").onclick = () => { hide($("setup-step-2")); show($("setup-step-3")); renderSetupTemplates(); };
+  if ($("setup-to-step-3")) $("setup-to-step-3").onclick = () => { hide($("setup-step-2")); show($("setup-step-3")); };
 
   if ($("setup-add-subject")) {
     $("setup-add-subject").onclick = () => {
@@ -184,7 +182,6 @@ async function saveEntry() {
   if (!currentUser || !supabaseClient) return;
   const day = state.selectedDate;
   try {
-    // Upsert ohne Rückmeldung für flüssiges Tippen
     await supabaseClient.from("day_entries").upsert({
       user_id: currentUser.id,
       day: day,
@@ -210,37 +207,34 @@ async function syncDown() {
   if (!currentUser || !supabaseClient) return;
   
   try {
-    // 1. Einträge und Config laden
-    // Wir verzichten auf .single() oder .maybeSingle(), um 404/406 Logs zu vermeiden.
-    // Ein .select() liefert einfach ein leeres Array [] zurück, wenn nichts gefunden wurde.
     const [entriesRes, configRes] = await Promise.all([
       supabaseClient.from("day_entries").select("*").eq("user_id", currentUser.id),
       supabaseClient.from("user_configs").select("*").eq("user_id", currentUser.id)
     ]);
 
+    // Falls Einträge da sind, lokal speichern
     if (entriesRes.data && entriesRes.data.length > 0) {
-      const s = getData(KEY.school, {}); 
-      const w = getData(KEY.work, {});
+      const s = {}; const w = {};
       entriesRes.data.forEach(e => { s[e.day] = e.school; w[e.day] = e.work; });
       setData(KEY.school, s); 
       setData(KEY.work, w);
     }
     
+    // Konfiguration (Fächer etc) laden
     if (configRes.data && configRes.data.length > 0) {
       const c = configRes.data[0];
       setData(KEY.subjects, c.subjects || []);
       setData(KEY.days, c.schooldays || [1, 2]);
       setData(KEY.workTemplates, c.templates || {});
-      if (c.subjects && c.subjects.length > 0) {
-        setData(KEY.setup, true);
-      }
+      setData(KEY.setup, true);
     } else {
-        // Falls gar keine Config da ist, stellen wir sicher, dass setupDone false ist
-        // (Wichtig für neue Accounts)
-        console.log("Keine Cloud-Konfiguration gefunden. Starte Setup-Modus.");
+      // Wenn Cloud leer ist, lokal prüfen
+      if (!localStorage.getItem(KEY.setup)) {
+          setData(KEY.setup, false);
+      }
     }
   } catch (e) {
-    console.log("Sync Hinweis: Cloud aktuell nicht erreichbar oder leer.");
+    console.error("Synchronisationsfehler:", e);
   }
 }
 
@@ -281,15 +275,22 @@ function renderSchool() {
   if (!list) return;
   list.innerHTML = "";
   if (!isSchoolDay()) {
-    list.innerHTML = "<div class='panel muted' style='text-align:center'>Kein Schultag laut Einstellungen.</div>";
+    list.innerHTML = "<div class='panel muted' style='text-align:center'>Heute ist kein Schultag.</div>";
     return;
   }
   const entries = getData(KEY.school, {});
   const dayData = entries[state.selectedDate] || {};
-  getData(KEY.subjects, []).forEach(sub => {
+  const subs = getData(KEY.subjects, []);
+  
+  if (subs.length === 0) {
+    list.innerHTML = "<div class='panel muted' style='text-align:center'>Konfiguriere deine Fächer im Setup.</div>";
+    return;
+  }
+
+  subs.forEach(sub => {
     const card = document.createElement("div");
     card.className = "panel";
-    card.innerHTML = `<div class="h3">${esc(sub)}</div><textarea class="input" style="min-height:80px" placeholder="Inhalt...">${esc(dayData[sub] || "")}</textarea>`;
+    card.innerHTML = `<div class="h3">${esc(sub)}</div><textarea class="input" style="min-height:80px" placeholder="Lerninhalt...">${esc(dayData[sub] || "")}</textarea>`;
     card.querySelector("textarea").oninput = (e) => {
       dayData[sub] = e.target.value;
       entries[state.selectedDate] = dayData;
@@ -305,14 +306,19 @@ function renderWork() {
   if (!list) return;
   list.innerHTML = "";
   if (isSchoolDay()) {
-    list.innerHTML = "<div class='panel muted' style='text-align:center'>Heute ist Berufsschule.</div>";
+    list.innerHTML = "<div class='panel muted' style='text-align:center'>Berufsschule - siehe Tab Schule.</div>";
     return;
   }
   const entries = getData(KEY.work, {});
   const dayData = entries[state.selectedDate] || { tasks: [], note: "" };
   const temps = getData(KEY.workTemplates, {});
 
-  Object.keys(temps).forEach(cat => {
+  const categories = Object.keys(temps);
+  if (categories.length === 0) {
+    list.innerHTML = "<div class='panel muted' style='text-align:center'>Keine Tätigkeitsbereiche definiert.</div>";
+  }
+
+  categories.forEach(cat => {
     const card = document.createElement("div");
     card.className = "panel";
     card.innerHTML = `<div class="h3">${esc(cat)}</div><div class="chip-container"></div>`;
@@ -335,7 +341,7 @@ function renderWork() {
   
   const notePanel = document.createElement("div");
   notePanel.className = "panel";
-  notePanel.innerHTML = `<div class="h3">Notizen / Sonstiges</div><textarea class="input" placeholder="Zusätzliche Infos...">${esc(dayData.note || "")}</textarea>`;
+  notePanel.innerHTML = `<div class="h3">Zusatznotizen</div><textarea class="input" placeholder="Sonstige Aufgaben...">${esc(dayData.note || "")}</textarea>`;
   notePanel.querySelector("textarea").oninput = (e) => {
     dayData.note = e.target.value;
     entries[state.selectedDate] = dayData;
@@ -393,12 +399,4 @@ function renderReport() {
   }
   if ($("report-draft-school")) $("report-draft-school").value = sText.trim();
   if ($("report-draft-work")) $("report-draft-work").value = Array.from(wSet).join(", ");
-}
-
-function renderSetupTemplates() {
-  const t = getData(KEY.workTemplates, {});
-  if (Object.keys(t).length === 0) {
-    const def = {"Werkstatt": [], "Büro": [], "Service": []};
-    setData(KEY.workTemplates, def);
-  }
 }

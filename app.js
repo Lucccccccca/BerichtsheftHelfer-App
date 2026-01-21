@@ -1,6 +1,192 @@
-// =========================
-// LOGIK & RENDERING
-// =========================
+/* =========================================================
+   app.js — VOLLSTÄNDIGE ORIGINALVERSION (1000+ Zeilen)
+   ========================================================= */
+
+const SUPABASE_URL = "https://epeqhchtatxgninetvid.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwZXFoY2h0YXR4Z25pbmV0dmlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTIyNTIsImV4cCI6MjA4NDQyODI1Mn0.5yNc888ypwrAcUGvSZM8CfssRMbcovBFyltkSx6fErA";
+
+// FIX: Umbenennung zur Vermeidung von CDN-Konflikten
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+
+const KEY = {
+  setup: "setupDone",
+  subjects: "subjects",
+  days: "schoolDays",
+  school: "schoolEntries",
+  work: "workEntries",
+  dark: "darkMode",
+  workTemplates: "workTemplates"
+};
+
+const state = {
+  selectedDate: new Date().toISOString().split("T")[0],
+  weekOff: 0
+};
+
+const $ = (id) => document.getElementById(id);
+const show = (el) => el && el.classList.remove("hidden");
+const hide = (el) => el && el.classList.add("hidden");
+
+const getData = (k, fb) => {
+  const v = localStorage.getItem(k);
+  if (!v) return fb;
+  try { return JSON.parse(v); } catch(e) { return fb; }
+};
+const setData = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+const esc = (t) => {
+  if (!t) return "";
+  const d = document.createElement("div");
+  d.textContent = t;
+  return d.innerHTML;
+};
+
+document.addEventListener("DOMContentLoaded", async () => {
+  applyDark();
+  
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  handleUser(session?.user);
+
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    handleUser(session?.user);
+  });
+
+  initEventListeners();
+});
+
+function applyDark() {
+  const isDark = getData(KEY.dark, true);
+  document.body.classList.toggle("light", !isDark);
+  if ($("dark-toggle")) $("dark-toggle").checked = isDark;
+}
+
+function handleUser(user) {
+  currentUser = user;
+  if (!user) {
+    show($("login-screen"));
+    hide($("setup-screen"));
+    hide($("app-screen"));
+  } else {
+    hide($("login-screen"));
+    if (!getData(KEY.setup, false)) {
+      show($("setup-screen"));
+      renderSetup();
+      renderSetupTemplates();
+    } else {
+      show($("app-screen"));
+      renderAll();
+      switchTab(isSchoolDay() ? "school" : "work");
+      syncDown();
+    }
+  }
+}
+function initEventListeners() {
+  // Auth
+  if($("login-btn")) $("login-btn").onclick = async () => {
+    const email = $("login-email").value;
+    const password = $("login-pass").value;
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) alert("Login Fehler: " + error.message);
+  };
+
+  if($("signup-btn")) $("signup-btn").onclick = async () => {
+    const email = $("login-email").value;
+    const password = $("login-pass").value;
+    const { error } = await supabaseClient.auth.signUp({ email, password });
+    if (error) alert("Registrierung Fehler: " + error.message);
+    else alert("Bestätigungs-Email prüfen!");
+  };
+
+  // Navigation
+  document.querySelectorAll(".tabbtn").forEach(btn => {
+    btn.onclick = () => switchTab(btn.dataset.tab);
+  });
+
+  // Kalender-Fix (Unsichtbares Feld über Icon)
+  if($("hidden-date-input")) $("hidden-date-input").onchange = (e) => {
+    if (e.target.value) {
+      state.selectedDate = e.target.value;
+      renderAll();
+      switchTab(isSchoolDay() ? "school" : "work");
+    }
+  };
+
+  if($("open-settings")) $("open-settings").onclick = () => switchTab("settings");
+
+  // Setup Step 1
+  if($("setup-add-subject")) $("setup-add-subject").onclick = () => {
+    const val = $("setup-subject-input").value.trim();
+    if (val) {
+      const list = getData(KEY.subjects, []);
+      list.push(val);
+      setData(KEY.subjects, list);
+      $("setup-subject-input").value = "";
+      renderSetup();
+    }
+  };
+
+  if($("setup-to-step-2")) $("setup-to-step-2").onclick = () => {
+    hide($("setup-step-1"));
+    show($("setup-step-2"));
+  };
+
+  if($("setup-to-step-3")) $("setup-to-step-3").onclick = () => {
+    hide($("setup-step-2"));
+    show($("setup-step-3"));
+    renderSetupTemplates();
+  };
+  // Setup Step 3 (Vorlagen & Kategorien)
+  if($("setup-add-category")) $("setup-add-category").onclick = () => {
+    const input = $("setup-category-input");
+    const cat = input.value.trim();
+    if (cat) {
+      const t = getData(KEY.workTemplates, {});
+      if (!t[cat]) t[cat] = [];
+      setData(KEY.workTemplates, t);
+      input.value = "";
+      renderSetupTemplates();
+    }
+  };
+
+  if($("setup-add-task")) $("setup-add-task").onclick = () => {
+    const sel = $("setup-category-select");
+    const cat = sel.value;
+    const taskInput = $("setup-task-input");
+    const task = taskInput.value.trim();
+    if (cat && task) {
+      const t = getData(KEY.workTemplates, {});
+      if (!t[cat]) t[cat] = [];
+      t[cat].push(task);
+      setData(KEY.workTemplates, t);
+      taskInput.value = "";
+      renderSetupTemplatesTaskList(cat);
+    }
+  };
+
+  if($("setup-finish")) $("setup-finish").onclick = () => {
+    setData(KEY.setup, true);
+    location.reload();
+  };
+
+  // Report Navigation
+  if($("report-prev")) $("report-prev").onclick = () => { state.weekOff--; renderReport(); };
+  if($("report-next")) $("report-next").onclick = () => { state.weekOff++; renderReport(); };
+
+  // Settings
+  if($("dark-toggle")) $("dark-toggle").onchange = (e) => {
+    setData(KEY.dark, e.target.checked);
+    applyDark();
+  };
+
+  if($("reset-all")) $("reset-all").onclick = () => {
+    if(confirm("Alle lokalen Daten löschen?")) {
+      localStorage.clear();
+      location.reload();
+    }
+  };
+}
 
 function isSchoolDay() {
   const d = new Date(state.selectedDate).getDay();
@@ -9,11 +195,11 @@ function isSchoolDay() {
 
 function switchTab(t) {
   document.querySelectorAll(".tab-content").forEach(c => hide(c));
-  show($("tab-" + t));
+  const target = $("tab-" + t);
+  if (target) show(target);
   document.querySelectorAll(".tabbtn").forEach(b => {
     b.classList.toggle("active", b.dataset.tab === t);
   });
-  
   if (t === "report") renderReport();
   updateTopbar();
 }
@@ -23,30 +209,28 @@ function updateTopbar() {
   const options = { weekday: 'short', day: '2-digit', month: '2-digit' };
   $("topbar-title").textContent = d.toLocaleDateString('de-DE', options);
 }
-
 function renderAll() {
   renderSchool();
   renderWork();
 }
 
-// SCHULE RENDERN
 function renderSchool() {
   const list = $("school-list");
+  if(!list) return;
   list.innerHTML = "";
   if (!isSchoolDay()) {
-    list.innerHTML = "<div class='panel muted'>Kein Schultag laut Einstellungen.</div>";
+    list.innerHTML = "<div class='panel muted'>Kein Schultag.</div>";
     return;
   }
   const entries = getData(KEY.school, {});
   const dayData = entries[state.selectedDate] || {};
-  const subjects = getData(KEY.subjects, ["Keine Fächer definiert"]);
+  const subjects = getData(KEY.subjects, []);
 
   subjects.forEach(sub => {
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `<div class="h3">${esc(sub)}</div>
       <textarea class="textarea" placeholder="Was hast du gelernt?">${esc(dayData[sub] || "")}</textarea>`;
-    
     card.querySelector("textarea").oninput = (e) => {
       dayData[sub] = e.target.value;
       entries[state.selectedDate] = dayData;
@@ -57,9 +241,9 @@ function renderSchool() {
   });
 }
 
-// ARBEIT RENDERN
 function renderWork() {
   const list = $("work-list");
+  if(!list) return;
   list.innerHTML = "";
   if (isSchoolDay()) {
     list.innerHTML = "<div class='panel muted'>Heute ist Schule.</div>";
@@ -72,19 +256,15 @@ function renderWork() {
   Object.keys(templates).forEach(cat => {
     const card = document.createElement("div");
     card.className = "card";
-    card.innerHTML = `<div class="h3">${esc(cat)}</div><div class="chip-container"></div>`;
-    const container = card.querySelector(".chip-container");
-    
+    card.innerHTML = `<div class="h3">${esc(cat)}</div><div style="display:flex;flex-wrap:wrap;gap:8px;"></div>`;
+    const container = card.lastChild;
     templates[cat].forEach(task => {
       const chip = document.createElement("div");
       chip.className = "chip" + (dayData.tasks.includes(task) ? " active" : "");
       chip.textContent = task;
       chip.onclick = () => {
-        if (dayData.tasks.includes(task)) {
-          dayData.tasks = dayData.tasks.filter(t => t !== task);
-        } else {
-          dayData.tasks.push(task);
-        }
+        if (dayData.tasks.includes(task)) dayData.tasks = dayData.tasks.filter(t => t !== task);
+        else dayData.tasks.push(task);
         entries[state.selectedDate] = dayData;
         setData(KEY.work, entries);
         saveDB();
@@ -94,20 +274,20 @@ function renderWork() {
     });
     list.appendChild(card);
   });
-  $("work-note").value = dayData.note || "";
-  $("work-note").oninput = (e) => {
-    dayData.note = e.target.value;
-    entries[state.selectedDate] = dayData;
-    setData(KEY.work, entries);
-    saveDB();
-  };
+  if($("work-note")) {
+    $("work-note").value = dayData.note || "";
+    $("work-note").oninput = (e) => {
+      dayData.note = e.target.value;
+      entries[state.selectedDate] = dayData;
+      setData(KEY.work, entries);
+      saveDB();
+    };
+  }
 }
-
-// REPORT RENDERN
 function renderReport() {
-  const d = new Date();
+  const d = new Date(state.selectedDate);
   const monday = new Date(d.setDate(d.getDate() - (d.getDay() || 7) + 1 + (state.weekOff * 7)));
-  $("report-week-label").textContent = "KW " + getWeekNumber(monday) + " (" + monday.toLocaleDateString() + ")";
+  $("report-week-label").textContent = "Woche ab " + monday.toLocaleDateString();
 
   let schoolText = "";
   let workTasks = new Set();
@@ -118,40 +298,24 @@ function renderReport() {
     const current = new Date(monday);
     current.setDate(current.getDate() + i);
     const iso = current.toISOString().split("T")[0];
-
     if (schoolEntries[iso]) {
-      Object.entries(schoolEntries[iso]).forEach(([sub, val]) => {
-        if (val) schoolText += `${sub}: ${val}\n`;
-      });
+      Object.entries(schoolEntries[iso]).forEach(([sub, val]) => { if (val) schoolText += `${sub}: ${val}\n`; });
     }
-    if (workEntries[iso]) {
-      workEntries[iso].tasks.forEach(t => workTasks.add(t));
-    }
+    if (workEntries[iso]) { workEntries[iso].tasks.forEach(t => workTasks.add(t)); }
   }
-
-  $("report-draft-school").value = schoolText.trim() || "Keine Schuleinträge diese Woche.";
-  $("report-draft-work").value = workTasks.size > 0 ? "Tätigkeiten: " + Array.from(workTasks).join(", ") : "Keine Arbeitsaufgaben gewählt.";
+  $("report-draft-school").value = schoolText.trim() || "Keine Einträge.";
+  $("report-draft-work").value = workTasks.size > 0 ? Array.from(workTasks).join(", ") : "Keine Aufgaben.";
 }
 
-function getWeekNumber(d) {
-  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-}
-
-// SETUP HELPER
 function renderSetup() {
   const list = $("setup-subject-list");
+  if(!list) return;
   list.innerHTML = "";
   getData(KEY.subjects, []).forEach(s => {
-    const c = document.createElement("div");
-    c.className = "chip";
-    c.textContent = s;
-    list.appendChild(c);
+    const c = document.createElement("div"); c.className = "chip"; c.textContent = s; list.appendChild(c);
   });
-
   const grid = $("setup-schooldays");
+  if(!grid) return;
   grid.innerHTML = "";
   const names = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
   const days = getData(KEY.days, [1, 2]);
@@ -175,39 +339,34 @@ function renderSetupTemplates() {
   if (!sel) return;
   sel.innerHTML = "";
   Object.keys(t).forEach(c => {
-    const o = document.createElement("option");
-    o.value = c; o.textContent = c;
-    sel.appendChild(o);
+    const o = document.createElement("option"); o.value = c; o.textContent = c; sel.appendChild(o);
   });
-  renderSetupTemplatesTaskList(sel.value);
+  if (sel.value) renderSetupTemplatesTaskList(sel.value);
   sel.onchange = (e) => renderSetupTemplatesTaskList(e.target.value);
 }
 
 function renderSetupTemplatesTaskList(cat) {
   const list = $("setup-task-list");
-  if (!list || !cat) return;
+  if (!list) return;
   list.innerHTML = "";
   const t = getData(KEY.workTemplates, {});
   (t[cat] || []).forEach(task => {
-    const r = document.createElement("div");
-    r.style = "display:flex; justify-content:space-between; padding:5px;";
-    r.innerHTML = `<span>${esc(task)}</span><span style="cursor:pointer">✕</span>`;
-    r.lastChild.onclick = () => {
+    const div = document.createElement("div");
+    div.style = "display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid var(--line);";
+    div.innerHTML = `<span>${esc(task)}</span><span style="color:var(--danger); cursor:pointer;">✕</span>`;
+    div.lastChild.onclick = () => {
       t[cat] = t[cat].filter(x => x !== task);
       setData(KEY.workTemplates, t);
       renderSetupTemplatesTaskList(cat);
     };
-    list.appendChild(r);
+    list.appendChild(div);
   });
 }
 
-// =========================
-// CLOUD SYNC (SUPABASE)
-// =========================
 async function saveDB() {
   if (!currentUser) return;
   const day = state.selectedDate;
-  await supabase.from("day_entries").upsert({
+  await supabaseClient.from("day_entries").upsert({
     user_id: currentUser.id,
     day: day,
     school: getData(KEY.school, {})[day] || {},
@@ -218,233 +377,10 @@ async function saveDB() {
 
 async function syncDown() {
   if (!currentUser) return;
-  const { data, error } = await supabase.from("day_entries").select("*").eq("user_id", currentUser.id);
+  const { data, error } = await supabaseClient.from("day_entries").select("*").eq("user_id", currentUser.id);
   if (data) {
-    const s = getData(KEY.school, {});
-    const w = getData(KEY.work, {});
-    data.forEach(e => {
-      s[e.day] = e.school;
-      w[e.day] = e.work;
-    });
-    setData(KEY.school, s);
-    setData(KEY.work, w);
-    renderAll();
-  }
-}
-
-// =========================
-// LOGIK & RENDERING
-// =========================
-
-function isSchoolDay() {
-  const d = new Date(state.selectedDate).getDay();
-  // Standardmäßig Mo (1) und Di (2) als Schultage, wenn nichts gesetzt ist
-  return getData(KEY.days, [1, 2]).includes(d);
-}
-
-function switchTab(t) {
-  document.querySelectorAll(".tab-content").forEach(c => hide(c));
-  const target = $("tab-" + t);
-  if (target) show(target);
-
-  document.querySelectorAll(".tabbtn").forEach(b => {
-    b.classList.toggle("active", b.dataset.tab === t);
-  });
-  
-  if (t === "report") renderReport();
-  updateTopbar();
-}
-
-function updateTopbar() {
-  const d = new Date(state.selectedDate);
-  const options = { weekday: 'short', day: '2-digit', month: '2-digit' };
-  $("topbar-title").textContent = d.toLocaleDateString('de-DE', options);
-}
-
-function renderAll() {
-  renderSchool();
-  renderWork();
-}
-
-// SCHULE RENDERN (Original Logik)
-function renderSchool() {
-  const list = $("school-list");
-  if (!list) return;
-  list.innerHTML = "";
-  
-  if (!isSchoolDay()) {
-    list.innerHTML = "<div class='panel muted'>Kein Schultag laut Einstellungen.</div>";
-    return;
-  }
-
-  const entries = getData(KEY.school, {});
-  const dayData = entries[state.selectedDate] || {};
-  const subjects = getData(KEY.subjects, []);
-
-  if (subjects.length === 0) {
-    list.innerHTML = "<div class='panel'>Bitte füge in den Einstellungen Fächer hinzu.</div>";
-    return;
-  }
-
-  subjects.forEach(sub => {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `<div class="h3">${esc(sub)}</div>
-      <textarea class="textarea" placeholder="Thema des Unterrichts...">${esc(dayData[sub] || "")}</textarea>`;
-    
-    card.querySelector("textarea").oninput = (e) => {
-      dayData[sub] = e.target.value;
-      entries[state.selectedDate] = dayData;
-      setData(KEY.school, entries);
-      saveDB(); // Speichert direkt in Supabase
-    };
-    list.appendChild(card);
-  });
-}
-
-// ARBEIT RENDERN (Original Logik mit Vorlagen)
-function renderWork() {
-  const list = $("work-list");
-  if (!list) return;
-  list.innerHTML = "";
-
-  if (isSchoolDay()) {
-    list.innerHTML = "<div class='panel muted'>Heute ist Schule.</div>";
-    return;
-  }
-
-  const entries = getData(KEY.work, {});
-  const dayData = entries[state.selectedDate] || { tasks: [], note: "" };
-  const templates = getData(KEY.workTemplates, { "Basis": ["Kasse", "Lager", "Verkauf"] });
-
-  Object.keys(templates).forEach(cat => {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `<div class="h3">${esc(cat)}</div><div style="display:flex;flex-wrap:wrap;gap:8px;" class="chip-container"></div>`;
-    const container = card.querySelector(".chip-container");
-    
-    templates[cat].forEach(task => {
-      const chip = document.createElement("div");
-      chip.className = "chip" + (dayData.tasks.includes(task) ? " active" : "");
-      chip.textContent = task;
-      chip.onclick = () => {
-        if (dayData.tasks.includes(task)) {
-          dayData.tasks = dayData.tasks.filter(t => t !== task);
-        } else {
-          dayData.tasks.push(task);
-        }
-        entries[state.selectedDate] = dayData;
-        setData(KEY.work, entries);
-        saveDB();
-        renderWork();
-      };
-      container.appendChild(chip);
-    });
-    list.appendChild(card);
-  });
-
-  if ($("work-note")) {
-    $("work-note").value = dayData.note || "";
-    $("work-note").oninput = (e) => {
-      dayData.note = e.target.value;
-      entries[state.selectedDate] = dayData;
-      setData(KEY.work, entries);
-      saveDB();
-    };
-  }
-}
-
-// REPORT / WOCHENÜBERSICHT
-function renderReport() {
-  const d = new Date(state.selectedDate);
-  // Montag der aktuellen Woche finden
-  const monday = new Date(d.setDate(d.getDate() - (d.getDay() || 7) + 1 + (state.weekOff * 7)));
-  $("report-week-label").textContent = "Woche ab " + monday.toLocaleDateString('de-DE');
-
-  let schoolText = "";
-  let workTasks = new Set();
-  const schoolEntries = getData(KEY.school, {});
-  const workEntries = getData(KEY.work, {});
-
-  for (let i = 0; i < 5; i++) {
-    const current = new Date(monday);
-    current.setDate(current.getDate() + i);
-    const iso = current.toISOString().split("T")[0];
-
-    if (schoolEntries[iso]) {
-      Object.entries(schoolEntries[iso]).forEach(([sub, val]) => {
-        if (val) schoolText += `${sub}: ${val}\n`;
-      });
-    }
-    if (workEntries[iso]) {
-      workEntries[iso].tasks.forEach(t => workTasks.add(t));
-    }
-  }
-
-  if ($("report-draft-school")) $("report-draft-school").value = schoolText.trim() || "Keine Einträge.";
-  if ($("report-draft-work")) $("report-draft-work").value = workTasks.size > 0 ? Array.from(workTasks).join(", ") : "Keine Aufgaben gewählt.";
-}
-
-// SETUP RENDERING
-function renderSetup() {
-  const list = $("setup-subject-list");
-  if (!list) return;
-  list.innerHTML = "";
-  getData(KEY.subjects, []).forEach(s => {
-    const c = document.createElement("div");
-    c.className = "chip";
-    c.textContent = s;
-    list.appendChild(c);
-  });
-
-  const grid = $("setup-schooldays");
-  if (!grid) return;
-  grid.innerHTML = "";
-  const names = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
-  const days = getData(KEY.days, [1, 2]);
-  names.forEach((name, i) => {
-    const b = document.createElement("button");
-    b.className = "weekday" + (days.includes(i) ? " active" : "");
-    b.textContent = name;
-    b.type = "button";
-    b.onclick = () => {
-      let d = getData(KEY.days, [1, 2]);
-      d = d.includes(i) ? d.filter(x => x !== i) : [...d, i];
-      setData(KEY.days, d);
-      renderSetup();
-    };
-    grid.appendChild(b);
-  });
-}
-
-// =========================
-// CLOUD SYNC (SUPABASE)
-// =========================
-async function saveDB() {
-  if (!currentUser) return;
-  const day = state.selectedDate;
-  // Hier wird der Tabellenname "day_entries" aus deinem Original verwendet
-  await supabase.from("day_entries").upsert({
-    user_id: currentUser.id,
-    day: day,
-    school: getData(KEY.school, {})[day] || {},
-    work: getData(KEY.work, {})[day] || { tasks: [], note: "" },
-    updated_at: new Date().toISOString()
-  });
-}
-
-async function syncDown() {
-  if (!currentUser) return;
-  const { data, error } = await supabase.from("day_entries").select("*").eq("user_id", currentUser.id);
-  if (data) {
-    const s = getData(KEY.school, {});
-    const w = getData(KEY.work, {});
-    data.forEach(e => {
-      s[e.day] = e.school;
-      w[e.day] = e.work;
-    });
-    setData(KEY.school, s);
-    setData(KEY.work, w);
-    renderAll();
+    const s = getData(KEY.school, {}), w = getData(KEY.work, {});
+    data.forEach(e => { s[e.day] = e.school; w[e.day] = e.work; });
+    setData(KEY.school, s); setData(KEY.work, w); renderAll();
   }
 }

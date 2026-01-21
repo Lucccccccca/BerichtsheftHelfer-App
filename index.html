@@ -12,51 +12,48 @@
 
   <div id="login-screen" class="screen">
     <div class="panel" style="max-width:520px;margin:40px auto;">
-      <div class="h2" style="margin:0 0 6px 0;">Login</div>
-      <div class="muted" style="margin-bottom:14px;">Cloud-Synchronisierung aktiv.</div>
-      <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="h2">Login</div>
+      <div class="muted">Cloud-Synchronisierung aktiv.</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:15px;">
         <input id="login-email" class="input" type="email" placeholder="E-Mail" autocomplete="email" />
         <input id="login-pass" class="input" type="password" placeholder="Passwort" autocomplete="current-password" />
       </div>
-      <div style="height:12px"></div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button id="login-btn" class="btn" type="button" style="flex:1;min-width:120px;">Einloggen</button>
-        <button id="signup-btn" class="btn btn-ghost" type="button" style="flex:1;min-width:120px;">Registrieren</button>
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button id="login-btn" class="btn" type="button">Einloggen</button>
+        <button id="signup-btn" class="btn btn-ghost" type="button">Registrieren</button>
       </div>
     </div>
   </div>
 
   <div id="setup-screen" class="screen hidden">
     <div class="panel" style="max-width:520px;margin:40px auto;">
-      <div class="h2">Willkommen</div>
       <div id="setup-step-1">
-        <div class="h3">Deine Schulfächer</div>
-        <div style="display:flex;gap:8px;margin-bottom:10px;">
-          <input id="setup-subject-input" class="input" style="margin:0" placeholder="z.B. Deutsch" />
-          <button id="setup-add-subject" class="btn" style="width:auto;padding:0 20px;" type="button">+</button>
+        <div class="h2">Schritt 1: Fächer</div>
+        <div style="display:flex;gap:8px;margin:15px 0;">
+          <input id="setup-subject-input" class="input" placeholder="z.B. Deutsch" />
+          <button id="setup-add-subject" class="btn" style="width:auto;">+</button>
         </div>
-        <div id="setup-subject-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;"></div>
-        <button id="setup-to-step-2" class="btn" type="button">Weiter</button>
+        <div id="setup-subject-list" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
+        <button id="setup-to-step-2" class="btn" style="margin-top:20px;">Weiter</button>
       </div>
 
       <div id="setup-step-2" class="hidden">
-        <div class="h3">Wann hast du Schule?</div>
-        <div id="setup-schooldays" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:20px;"></div>
-        <button id="setup-to-step-3" class="btn" type="button">Weiter</button>
+        <div class="h2">Schritt 2: Schultage</div>
+        <div id="setup-schooldays" style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin:20px 0;"></div>
+        <button id="setup-to-step-3" class="btn">Weiter</button>
       </div>
 
       <div id="setup-step-3" class="hidden">
-        <div class="h3">Aufgaben-Vorlagen</div>
-        <div style="display:flex;flex-direction:column;gap:10px;">
-          <input id="setup-category-input" class="input" placeholder="Kategorie (z.B. Verkauf)" />
-          <button id="setup-add-category" class="btn btn-ghost" type="button">Kategorie hinzufügen</button>
-          <hr style="border:0;border-top:1px solid var(--line);margin:10px 0;">
+        <div class="h2">Schritt 3: Aufgaben</div>
+        <input id="setup-category-input" class="input" placeholder="Kategorie Name" />
+        <button id="setup-add-category" class="btn btn-ghost" type="button">Kategorie erstellen</button>
+        <div style="margin-top:15px;">
           <select id="setup-category-select" class="input"></select>
-          <input id="setup-task-input" class="input" placeholder="Tätigkeit hinzufügen..." />
+          <input id="setup-task-input" class="input" placeholder="Tätigkeit..." />
           <button id="setup-add-task" class="btn btn-ghost" type="button">Hinzufügen</button>
-          <div id="setup-task-list" style="margin-top:10px;"></div>
         </div>
-        <button id="setup-finish" class="btn" style="margin-top:20px;" type="button">Fertigstellen</button>
+        <div id="setup-task-list" style="margin-top:10px;max-height:200px;overflow-y:auto;"></div>
+        <button id="setup-finish" class="btn" style="margin-top:20px;">Einrichtung fertig</button>
       </div>
     </div>
   </div>
@@ -67,15 +64,15 @@
         <span style="font-size:1.6rem;">📅</span>
         <input type="date" id="hidden-date-input" style="position:absolute; opacity:0; left:0; top:0; width:100%; height:100%; cursor:pointer;">
       </div>
-      <div id="topbar-title" class="topbar-title">Wird geladen...</div>
-      <button id="open-settings" class="btn-icon" type="button">⚙️</button>
+      <div id="topbar-title" class="topbar-title">Datum</div>
+      <button id="open-settings" class="btn-icon">⚙️</button>
     </div>
 
-    <div class="content" style="padding-bottom:100px;">
+    <div class="content">
       <div id="tab-day" class="tab-content hidden">
-        <div class="panel"><div id="day-info-text">Wähle einen Tag...</div></div>
+        <div class="panel" id="day-info-text">Wähle ein Datum.</div>
       </div>
-
+      
       <div id="tab-school" class="tab-content hidden">
         <div id="school-list"></div>
       </div>
@@ -91,36 +88,33 @@
       <div id="tab-report" class="tab-content hidden">
         <div class="panel" style="display:flex;justify-content:space-between;align-items:center;">
           <button id="report-prev" class="btn-icon">◀</button>
-          <div id="report-week-label" style="font-weight:800;">Woche</div>
+          <div id="report-week-label" style="font-weight:bold;">Woche</div>
           <button id="report-next" class="btn-icon">▶</button>
         </div>
         <div class="panel">
-          <div class="muted">Schule (Zusammenfassung):</div>
-          <textarea id="report-draft-school" class="textarea" style="height:140px;margin-top:8px;" readonly></textarea>
-          <div class="muted" style="margin-top:16px;">Arbeit (Zusammenfassung):</div>
-          <textarea id="report-draft-work" class="textarea" style="height:120px;margin-top:8px;" readonly></textarea>
+          <textarea id="report-draft-school" class="textarea" style="height:140px;" readonly></textarea>
+          <textarea id="report-draft-work" class="textarea" style="height:120px;margin-top:10px;" readonly></textarea>
         </div>
       </div>
 
       <div id="tab-settings" class="tab-content hidden">
         <div class="panel">
-          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;">
-            <input type="checkbox" id="dark-toggle" style="width:20px;height:20px;"> 
-            <span>Dark Mode aktiv</span>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+            <input type="checkbox" id="dark-toggle"> Dark Mode aktiv
           </label>
         </div>
         <div class="panel">
-          <button id="reset-all" class="btn btn-danger" type="button">Alles zurücksetzen</button>
+          <button id="reset-all" class="btn btn-danger">Lokale Daten löschen</button>
         </div>
       </div>
     </div>
 
     <div class="tabs">
-      <button class="tabbtn" data-tab="day" type="button">Tag</button>
-      <button class="tabbtn" data-tab="school" type="button">Schule</button>
-      <button class="tabbtn active" data-tab="work" type="button">Arbeit</button>
-      <button class="tabbtn" data-tab="report" type="button">Report</button>
-      <button class="tabbtn" data-tab="settings" type="button">⚙️</button>
+      <button class="tabbtn" data-tab="day">Tag</button>
+      <button class="tabbtn" data-tab="school">Schule</button>
+      <button class="tabbtn active" data-tab="work">Arbeit</button>
+      <button class="tabbtn" data-tab="report">Bericht</button>
+      <button class="tabbtn" data-tab="settings">⚙️</button>
     </div>
   </div>
 

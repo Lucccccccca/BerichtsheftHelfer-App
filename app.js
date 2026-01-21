@@ -1,4 +1,3 @@
-
 /**
  * app.js - Vollständige Logik für Berichtsheft Pro
  * Optimierte Version zur Vermeidung von 404-Log-Fehlern und Verbindungsabbrüchen.
@@ -211,9 +210,9 @@ async function syncDown() {
   if (!currentUser || !supabaseClient) return;
   
   try {
-    // 1. Einträge parallel laden
-    // .maybeSingle() kann bei 0 Treffern einen 406/404 im Log erzeugen, 
-    // daher nutzen wir .select() und prüfen die Länge manuell
+    // 1. Einträge und Config laden
+    // Wir verzichten auf .single() oder .maybeSingle(), um 404/406 Logs zu vermeiden.
+    // Ein .select() liefert einfach ein leeres Array [] zurück, wenn nichts gefunden wurde.
     const [entriesRes, configRes] = await Promise.all([
       supabaseClient.from("day_entries").select("*").eq("user_id", currentUser.id),
       supabaseClient.from("user_configs").select("*").eq("user_id", currentUser.id)
@@ -232,7 +231,13 @@ async function syncDown() {
       setData(KEY.subjects, c.subjects || []);
       setData(KEY.days, c.schooldays || [1, 2]);
       setData(KEY.workTemplates, c.templates || {});
-      if (c.subjects && c.subjects.length > 0) setData(KEY.setup, true);
+      if (c.subjects && c.subjects.length > 0) {
+        setData(KEY.setup, true);
+      }
+    } else {
+        // Falls gar keine Config da ist, stellen wir sicher, dass setupDone false ist
+        // (Wichtig für neue Accounts)
+        console.log("Keine Cloud-Konfiguration gefunden. Starte Setup-Modus.");
     }
   } catch (e) {
     console.log("Sync Hinweis: Cloud aktuell nicht erreichbar oder leer.");

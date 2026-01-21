@@ -2,159 +2,85 @@
 <html lang="de">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>Berichtsheft App</title>
-  <link rel="manifest" href="./manifest.json" />
-  <meta name="theme-color" content="#0b0f16" />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-
   <div id="login-screen" class="screen">
-    <div class="panel" style="max-width:520px;margin:40px auto;">
-      <div class="h2" style="margin:0 0 6px 0;">Login</div>
-      <div class="muted" style="margin-bottom:14px;">Melde dich an, damit deine Daten in der Cloud gespeichert werden.</div>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <input id="login-email" class="input" type="email" placeholder="E-Mail" autocomplete="email" />
-        <input id="login-pass" class="input" type="password" placeholder="Passwort" autocomplete="current-password" />
-      </div>
-      <div style="height:12px"></div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button id="login-btn" class="btn" type="button" style="flex:1;min-width:120px;">Einloggen</button>
-        <button id="signup-btn" class="btn btn-ghost" type="button" style="flex:1;min-width:120px;">Registrieren</button>
+    <div class="panel" style="max-width:450px;margin:10vh auto;">
+      <div class="h2">Login</div>
+      <div class="muted">Cloud-Speicherung aktiv</div>
+      <input id="login-email" class="input" type="email" placeholder="E-Mail" style="margin-top:15px;"/>
+      <input id="login-pass" class="input" type="password" placeholder="Passwort" style="margin-top:10px;"/>
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button id="login-btn" class="btn">Einloggen</button>
+        <button id="signup-btn" class="btn btn-ghost">Registrieren</button>
       </div>
     </div>
   </div>
 
   <div id="setup-screen" class="screen hidden">
-    <div class="panel" style="max-width:520px;margin:40px auto;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <div class="h2" style="margin:0;">Setup</div>
-        <div id="setup-progress" class="muted" style="font-weight:bold;">1 / 3</div>
-      </div>
-
-      <div class="setup-step" data-step="1">
-        <div class="muted" style="margin-bottom:12px;">Welche Fächer hast du in der Berufsschule?</div>
-        <div style="display:flex;gap:8px;">
+    <div class="panel" style="max-width:500px;margin:40px auto;">
+      <div id="setup-step-1">
+        <div class="h2">Schritt 1: Fächer</div>
+        <div style="display:flex;gap:8px;margin:15px 0;">
           <input id="setup-subject-input" class="input" placeholder="z.B. Deutsch" />
-          <button id="setup-add-subject" class="btn" type="button" style="width:auto;">+</button>
+          <button id="setup-add-subject" class="btn" style="width:auto;">+</button>
         </div>
-        <div id="setup-subject-list" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;"></div>
-        <div style="height:20px"></div>
-        <button id="setup-next-1" class="btn" type="button">Weiter</button>
+        <div id="setup-subject-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        <button onclick="document.getElementById('setup-step-1').classList.add('hidden');document.getElementById('setup-step-2').classList.remove('hidden')" class="btn" style="margin-top:20px;">Weiter</button>
       </div>
-
-      <div class="setup-step hidden" data-step="2">
-        <div class="muted" style="margin-bottom:12px;">An welchen Wochentagen hast du Schule?</div>
-        <div id="setup-schooldays" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(60px, 1fr));gap:8px;"></div>
-        <div style="height:20px"></div>
-        <button id="setup-next-2" class="btn" type="button">Weiter</button>
-      </div>
-
-      <div class="setup-step hidden" data-step="3">
-        <div class="h3">Fast fertig!</div>
-        <div class="muted">Du kannst deine Tätigkeiten für die Arbeit später in den Einstellungen verfeinern.</div>
-        <div style="height:20px"></div>
-        <button id="setup-finish" class="btn" type="button">App starten</button>
+      <div id="setup-step-2" class="hidden">
+        <div class="h2">Schritt 2: Schultage</div>
+        <div id="setup-schooldays" style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin:20px 0;"></div>
+        <button id="setup-finish" class="btn">Einrichtung abschließen</button>
       </div>
     </div>
   </div>
 
   <div id="app-screen" class="screen hidden">
-    
     <div class="topbar">
-      <button id="open-calendar" class="btn-icon" type="button" style="font-size:1.5rem;">📅</button>
-      <div id="topbar-title" class="topbar-title">Datum...</div>
-      <button id="open-settings" class="btn-icon" type="button" style="font-size:1.5rem;">⚙️</button>
+      <div style="position: relative; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center;">
+        <span style="font-size: 1.5rem;">📅</span>
+        <input type="date" id="hidden-date-input" style="position:absolute; opacity:0; left:0; top:0; width:100%; height:100%; cursor:pointer;">
+      </div>
+      <div id="topbar-title" class="topbar-title">Datum laden...</div>
+      <button id="open-settings" class="btn-icon">⚙️</button>
     </div>
 
     <div class="content">
-      
-      <div id="tab-school" class="tab-content hidden">
-        <div id="school-list"></div>
-      </div>
-
+      <div id="tab-school" class="tab-content hidden"><div id="school-list"></div></div>
       <div id="tab-work" class="tab-content hidden">
         <div id="work-list"></div>
-        <div class="card">
-          <div class="h3">Notizen / Besonderheiten</div>
-          <textarea id="work-note" class="textarea" placeholder="Was gab es sonst noch?"></textarea>
-        </div>
+        <div class="card"><div class="h3">Zusätzliche Notizen</div><textarea id="work-note" class="textarea" placeholder="Was gab es heute Besonderes?"></textarea></div>
       </div>
-
       <div id="tab-report" class="tab-content hidden">
-        <div class="panel" style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="panel" style="display:flex;justify-content:space-between;align-items:center;">
           <button id="report-prev" class="btn-icon">◀</button>
-          <div id="report-week" style="font-weight:bold">Woche</div>
+          <div id="report-week" style="font-weight:bold;">Woche</div>
           <button id="report-next" class="btn-icon">▶</button>
         </div>
-        <div id="report-week-list"></div>
         <div class="panel">
-          <div class="h3">Zusammenfassung (Draft)</div>
-          <div class="muted" style="font-size:0.85rem;margin-bottom:8px;">Kopiere dies in dein offizielles Berichtsheft:</div>
-          <textarea id="report-draft-school" class="textarea" style="height:120px" readonly></textarea>
-          <div style="height:10px"></div>
-          <textarea id="report-draft-work" class="textarea" style="height:80px" readonly></textarea>
+          <div class="muted" style="margin-bottom:5px;">Schul-Text:</div>
+          <textarea id="report-draft-school" class="textarea" style="height:120px;" readonly></textarea>
+          <div class="muted" style="margin:10px 0 5px 0;">Arbeits-Text:</div>
+          <textarea id="report-draft-work" class="textarea" style="height:100px;" readonly></textarea>
         </div>
       </div>
-
       <div id="tab-settings" class="tab-content hidden">
-        <div class="panel">
-          <div class="h2">Einstellungen</div>
-          <label class="check">
-            <input type="checkbox" id="dark-toggle"> <span>Dark Mode aktivieren</span>
-          </label>
-        </div>
-
-        <div class="panel">
-          <div class="h3">Schultage</div>
-          <div id="settings-schooldays" style="display:grid;grid-template-columns:repeat(7, 1fr);gap:4px;"></div>
-        </div>
-
-        <div class="panel">
-          <div class="h3">Fächer</div>
-          <div id="settings-subject-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
-          <div style="display:flex;gap:8px;">
-            <input id="settings-subject-input" class="input" placeholder="Neues Fach..." />
-            <button id="settings-add-subject" class="btn" style="width:auto;">+</button>
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="h3">Arbeits-Vorlagen</div>
-          <div style="display:flex;gap:6px;margin-bottom:10px;">
-            <input id="settings-category-input" class="input" placeholder="Neue Kategorie (z.B. Lager)..." />
-            <button id="settings-add-category" class="btn" style="width:auto;">+</button>
-          </div>
-          <div style="display:flex;gap:6px;align-items:center;">
-            <select id="settings-category-select" class="select"></select>
-            <input id="settings-task-input" class="input" placeholder="Tätigkeit..." />
-            <button id="settings-add-task" class="btn" style="width:auto;">+</button>
-          </div>
-          <div id="settings-task-list" style="margin-top:10px;"></div>
-        </div>
-
-        <div class="panel">
-          <button id="reset-all" class="btn btn-danger">Alle lokalen Daten löschen</button>
-        </div>
+        <div class="panel"><h3>Design</h3><label class="check"><input type="checkbox" id="dark-toggle"> Dark Mode aktiv</label></div>
+        <div class="panel"><h3>Schultage anpassen</h3><div id="settings-schooldays" style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;"></div></div>
+        <div class="panel"><h3>Gefahr</h3><button id="reset-all" class="btn btn-danger">Alle Daten lokal löschen</button></div>
       </div>
-
     </div>
 
     <div class="tabs">
-      <button class="tabbtn active" data-tab="school" type="button">
-        <div style="font-size:1.4rem;">🏫</div><div>Schule</div>
-      </button>
-      <button class="tabbtn" data-tab="work" type="button">
-        <div style="font-size:1.4rem;">💼</div><div>Arbeit</div>
-      </button>
-      <button class="tabbtn" data-tab="report" type="button">
-        <div style="font-size:1.4rem;">📝</div><div>Bericht</div>
-      </button>
+      <button class="tabbtn active" data-tab="school">🏫<br><small>Schule</small></button>
+      <button class="tabbtn" data-tab="work">💼<br><small>Arbeit</small></button>
+      <button class="tabbtn" data-tab="report">📝<br><small>Bericht</small></button>
     </div>
-
   </div>
-
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./app.js"></script>
 </body>

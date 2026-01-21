@@ -1,6 +1,6 @@
 /**
  * app.js - Vollständige Logik für Berichtsheft Pro
- * Final korrigierte Version: Stabile Synchronisation und UI-Refresh nach Daten-Download.
+ * Korrigiert: Tabellenname user_config & verbesserte Lade-Logik.
  */
 
 // --- KONFIGURATION ---
@@ -82,7 +82,7 @@ function handleUser(user) {
     hide($("app-screen"));
   } else {
     hide($("login-screen"));
-    // Erst Daten laden, dann UI entscheiden
+    // Strikte Abfolge: Erst syncen, dann UI anzeigen
     syncDown().then(() => {
       const isSetupDone = getData(KEY.setup, false);
       if (!isSetupDone) {
@@ -188,53 +188,55 @@ async function saveEntry() {
       school: getData(KEY.school, {})[day] || {},
       work: getData(KEY.work, {})[day] || { tasks: [], note: "" }
     }, { onConflict: 'user_id, day' });
-  } catch (e) {}
+  } catch (e) { console.error("SaveEntry Error:", e); }
 }
 
 async function saveConfig() {
   if (!currentUser || !supabaseClient) return;
   try {
+    // Tabellenname korrigiert auf user_config
     await supabaseClient.from("user_config").upsert({
       user_id: currentUser.id,
       subjects: getData(KEY.subjects, []),
       schooldays: getData(KEY.days, [1, 2]),
       templates: getData(KEY.workTemplates, {})
     }, { onConflict: 'user_id' });
-  } catch (e) {}
+  } catch (e) { console.error("SaveConfig Error:", e); }
 }
 
 async function syncDown() {
   if (!currentUser || !supabaseClient) return;
   
   try {
+    // Tabellenname korrigiert auf user_config
     const [entriesRes, configRes] = await Promise.all([
       supabaseClient.from("day_entries").select("*").eq("user_id", currentUser.id),
       supabaseClient.from("user_config").select("*").eq("user_id", currentUser.id)
     ]);
 
-    // Falls Einträge da sind, lokal speichern
     if (entriesRes.data && entriesRes.data.length > 0) {
       const s = {}; const w = {};
       entriesRes.data.forEach(e => { s[e.day] = e.school; w[e.day] = e.work; });
       setData(KEY.school, s); 
       setData(KEY.work, w);
+      console.log("Cloud-Einträge geladen.");
     }
     
-    // Konfiguration (Fächer etc) laden
     if (configRes.data && configRes.data.length > 0) {
       const c = configRes.data[0];
       setData(KEY.subjects, c.subjects || []);
       setData(KEY.days, c.schooldays || [1, 2]);
       setData(KEY.workTemplates, c.templates || {});
       setData(KEY.setup, true);
+      console.log("Cloud-Config geladen.");
     } else {
-      // Wenn Cloud leer ist, lokal prüfen
-      if (!localStorage.getItem(KEY.setup)) {
+      // Falls in der Cloud nichts ist, prüfen wir ob lokal schon mal was war
+      if (localStorage.getItem(KEY.setup) === null) {
           setData(KEY.setup, false);
       }
     }
   } catch (e) {
-    console.error("Synchronisationsfehler:", e);
+    console.error("SyncDown Fehler:", e);
   }
 }
 
@@ -275,7 +277,7 @@ function renderSchool() {
   if (!list) return;
   list.innerHTML = "";
   if (!isSchoolDay()) {
-    list.innerHTML = "<div class='panel muted' style='text-align:center'>Heute ist kein Schultag.</div>";
+    list.innerHTML = "<div class='panel muted' style='text-align:center'>Kein Schultag laut Einstellung.</div>";
     return;
   }
   const entries = getData(KEY.school, {});
@@ -283,14 +285,14 @@ function renderSchool() {
   const subs = getData(KEY.subjects, []);
   
   if (subs.length === 0) {
-    list.innerHTML = "<div class='panel muted' style='text-align:center'>Konfiguriere deine Fächer im Setup.</div>";
+    list.innerHTML = "<div class='panel muted' style='text-align:center'>Fächer-Liste ist leer. Bitte im Setup hinzufügen.</div>";
     return;
   }
 
   subs.forEach(sub => {
     const card = document.createElement("div");
     card.className = "panel";
-    card.innerHTML = `<div class="h3">${esc(sub)}</div><textarea class="input" style="min-height:80px" placeholder="Lerninhalt...">${esc(dayData[sub] || "")}</textarea>`;
+    card.innerHTML = `<div class="h3">${esc(sub)}</div><textarea class="input" style="min-height:80px" placeholder="Inhalt eingeben...">${esc(dayData[sub] || "")}</textarea>`;
     card.querySelector("textarea").oninput = (e) => {
       dayData[sub] = e.target.value;
       entries[state.selectedDate] = dayData;
@@ -306,7 +308,7 @@ function renderWork() {
   if (!list) return;
   list.innerHTML = "";
   if (isSchoolDay()) {
-    list.innerHTML = "<div class='panel muted' style='text-align:center'>Berufsschule - siehe Tab Schule.</div>";
+    list.innerHTML = "<div class='panel muted' style='text-align:center'>Heute ist Berufsschule.</div>";
     return;
   }
   const entries = getData(KEY.work, {});
@@ -315,7 +317,7 @@ function renderWork() {
 
   const categories = Object.keys(temps);
   if (categories.length === 0) {
-    list.innerHTML = "<div class='panel muted' style='text-align:center'>Keine Tätigkeitsbereiche definiert.</div>";
+    list.innerHTML = "<div class='panel muted' style='text-align:center'>Keine Tätigkeitsbereiche im Setup angelegt.</div>";
   }
 
   categories.forEach(cat => {
@@ -341,7 +343,7 @@ function renderWork() {
   
   const notePanel = document.createElement("div");
   notePanel.className = "panel";
-  notePanel.innerHTML = `<div class="h3">Zusatznotizen</div><textarea class="input" placeholder="Sonstige Aufgaben...">${esc(dayData.note || "")}</textarea>`;
+  notePanel.innerHTML = `<div class="h3">Zusätzliche Notizen</div><textarea class="input" placeholder="Sonstiges...">${esc(dayData.note || "")}</textarea>`;
   notePanel.querySelector("textarea").oninput = (e) => {
     dayData.note = e.target.value;
     entries[state.selectedDate] = dayData;

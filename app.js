@@ -231,3 +231,220 @@ async function syncDown() {
     renderAll();
   }
 }
+
+// =========================
+// LOGIK & RENDERING
+// =========================
+
+function isSchoolDay() {
+  const d = new Date(state.selectedDate).getDay();
+  // Standardmäßig Mo (1) und Di (2) als Schultage, wenn nichts gesetzt ist
+  return getData(KEY.days, [1, 2]).includes(d);
+}
+
+function switchTab(t) {
+  document.querySelectorAll(".tab-content").forEach(c => hide(c));
+  const target = $("tab-" + t);
+  if (target) show(target);
+
+  document.querySelectorAll(".tabbtn").forEach(b => {
+    b.classList.toggle("active", b.dataset.tab === t);
+  });
+  
+  if (t === "report") renderReport();
+  updateTopbar();
+}
+
+function updateTopbar() {
+  const d = new Date(state.selectedDate);
+  const options = { weekday: 'short', day: '2-digit', month: '2-digit' };
+  $("topbar-title").textContent = d.toLocaleDateString('de-DE', options);
+}
+
+function renderAll() {
+  renderSchool();
+  renderWork();
+}
+
+// SCHULE RENDERN (Original Logik)
+function renderSchool() {
+  const list = $("school-list");
+  if (!list) return;
+  list.innerHTML = "";
+  
+  if (!isSchoolDay()) {
+    list.innerHTML = "<div class='panel muted'>Kein Schultag laut Einstellungen.</div>";
+    return;
+  }
+
+  const entries = getData(KEY.school, {});
+  const dayData = entries[state.selectedDate] || {};
+  const subjects = getData(KEY.subjects, []);
+
+  if (subjects.length === 0) {
+    list.innerHTML = "<div class='panel'>Bitte füge in den Einstellungen Fächer hinzu.</div>";
+    return;
+  }
+
+  subjects.forEach(sub => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<div class="h3">${esc(sub)}</div>
+      <textarea class="textarea" placeholder="Thema des Unterrichts...">${esc(dayData[sub] || "")}</textarea>`;
+    
+    card.querySelector("textarea").oninput = (e) => {
+      dayData[sub] = e.target.value;
+      entries[state.selectedDate] = dayData;
+      setData(KEY.school, entries);
+      saveDB(); // Speichert direkt in Supabase
+    };
+    list.appendChild(card);
+  });
+}
+
+// ARBEIT RENDERN (Original Logik mit Vorlagen)
+function renderWork() {
+  const list = $("work-list");
+  if (!list) return;
+  list.innerHTML = "";
+
+  if (isSchoolDay()) {
+    list.innerHTML = "<div class='panel muted'>Heute ist Schule.</div>";
+    return;
+  }
+
+  const entries = getData(KEY.work, {});
+  const dayData = entries[state.selectedDate] || { tasks: [], note: "" };
+  const templates = getData(KEY.workTemplates, { "Basis": ["Kasse", "Lager", "Verkauf"] });
+
+  Object.keys(templates).forEach(cat => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<div class="h3">${esc(cat)}</div><div style="display:flex;flex-wrap:wrap;gap:8px;" class="chip-container"></div>`;
+    const container = card.querySelector(".chip-container");
+    
+    templates[cat].forEach(task => {
+      const chip = document.createElement("div");
+      chip.className = "chip" + (dayData.tasks.includes(task) ? " active" : "");
+      chip.textContent = task;
+      chip.onclick = () => {
+        if (dayData.tasks.includes(task)) {
+          dayData.tasks = dayData.tasks.filter(t => t !== task);
+        } else {
+          dayData.tasks.push(task);
+        }
+        entries[state.selectedDate] = dayData;
+        setData(KEY.work, entries);
+        saveDB();
+        renderWork();
+      };
+      container.appendChild(chip);
+    });
+    list.appendChild(card);
+  });
+
+  if ($("work-note")) {
+    $("work-note").value = dayData.note || "";
+    $("work-note").oninput = (e) => {
+      dayData.note = e.target.value;
+      entries[state.selectedDate] = dayData;
+      setData(KEY.work, entries);
+      saveDB();
+    };
+  }
+}
+
+// REPORT / WOCHENÜBERSICHT
+function renderReport() {
+  const d = new Date(state.selectedDate);
+  // Montag der aktuellen Woche finden
+  const monday = new Date(d.setDate(d.getDate() - (d.getDay() || 7) + 1 + (state.weekOff * 7)));
+  $("report-week-label").textContent = "Woche ab " + monday.toLocaleDateString('de-DE');
+
+  let schoolText = "";
+  let workTasks = new Set();
+  const schoolEntries = getData(KEY.school, {});
+  const workEntries = getData(KEY.work, {});
+
+  for (let i = 0; i < 5; i++) {
+    const current = new Date(monday);
+    current.setDate(current.getDate() + i);
+    const iso = current.toISOString().split("T")[0];
+
+    if (schoolEntries[iso]) {
+      Object.entries(schoolEntries[iso]).forEach(([sub, val]) => {
+        if (val) schoolText += `${sub}: ${val}\n`;
+      });
+    }
+    if (workEntries[iso]) {
+      workEntries[iso].tasks.forEach(t => workTasks.add(t));
+    }
+  }
+
+  if ($("report-draft-school")) $("report-draft-school").value = schoolText.trim() || "Keine Einträge.";
+  if ($("report-draft-work")) $("report-draft-work").value = workTasks.size > 0 ? Array.from(workTasks).join(", ") : "Keine Aufgaben gewählt.";
+}
+
+// SETUP RENDERING
+function renderSetup() {
+  const list = $("setup-subject-list");
+  if (!list) return;
+  list.innerHTML = "";
+  getData(KEY.subjects, []).forEach(s => {
+    const c = document.createElement("div");
+    c.className = "chip";
+    c.textContent = s;
+    list.appendChild(c);
+  });
+
+  const grid = $("setup-schooldays");
+  if (!grid) return;
+  grid.innerHTML = "";
+  const names = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  const days = getData(KEY.days, [1, 2]);
+  names.forEach((name, i) => {
+    const b = document.createElement("button");
+    b.className = "weekday" + (days.includes(i) ? " active" : "");
+    b.textContent = name;
+    b.type = "button";
+    b.onclick = () => {
+      let d = getData(KEY.days, [1, 2]);
+      d = d.includes(i) ? d.filter(x => x !== i) : [...d, i];
+      setData(KEY.days, d);
+      renderSetup();
+    };
+    grid.appendChild(b);
+  });
+}
+
+// =========================
+// CLOUD SYNC (SUPABASE)
+// =========================
+async function saveDB() {
+  if (!currentUser) return;
+  const day = state.selectedDate;
+  // Hier wird der Tabellenname "day_entries" aus deinem Original verwendet
+  await supabase.from("day_entries").upsert({
+    user_id: currentUser.id,
+    day: day,
+    school: getData(KEY.school, {})[day] || {},
+    work: getData(KEY.work, {})[day] || { tasks: [], note: "" },
+    updated_at: new Date().toISOString()
+  });
+}
+
+async function syncDown() {
+  if (!currentUser) return;
+  const { data, error } = await supabase.from("day_entries").select("*").eq("user_id", currentUser.id);
+  if (data) {
+    const s = getData(KEY.school, {});
+    const w = getData(KEY.work, {});
+    data.forEach(e => {
+      s[e.day] = e.school;
+      w[e.day] = e.work;
+    });
+    setData(KEY.school, s);
+    setData(KEY.work, w);
+    renderAll();
+  }
+}

@@ -133,6 +133,9 @@ document.addEventListener("DOMContentLoaded", () => {
           setData(KEY.workTemplates, t);
           $("setup-category-input").value = "";
           renderSetupTemplates();
+          // Setze das Dropdown direkt auf den neuen Bereich
+          if ($("setup-category-select")) $("setup-category-select").value = cat;
+          renderSetupTemplatesTaskList(cat);
         }
       }
     };
@@ -144,6 +147,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const task = $("setup-task-input").value.trim();
       if (cat && task) {
         const t = getData(KEY.workTemplates, {});
+        if (!t[cat]) t[cat] = [];
         t[cat].push(task);
         setData(KEY.workTemplates, t);
         $("setup-task-input").value = "";
@@ -161,7 +165,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- SETTINGS LOGIK ---
-  // Bereich hinzufügen in Settings
   if ($("settings-add-category")) {
     $("settings-add-category").onclick = () => {
       const cat = $("settings-category-input").value.trim();
@@ -172,6 +175,8 @@ document.addEventListener("DOMContentLoaded", () => {
           setData(KEY.workTemplates, t);
           $("settings-category-input").value = "";
           renderSettingsTemplates();
+          if ($("settings-category-select")) $("settings-category-select").value = cat;
+          renderSettingsTaskList(cat);
           saveConfig();
         }
       }
@@ -184,10 +189,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const task = $("settings-task-input").value.trim();
       if (cat && task) {
         const t = getData(KEY.workTemplates, {});
+        if (!t[cat]) t[cat] = [];
         t[cat].push(task);
         setData(KEY.workTemplates, t);
         $("settings-task-input").value = "";
-        renderSettingsTemplates();
+        renderSettingsTaskList(cat);
         saveConfig();
       }
     };
@@ -210,7 +216,6 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // Wochenbericht Navigation
   if ($("report-prev")) $("report-prev").onclick = () => { state.weekOff--; renderReport(); };
   if ($("report-next")) $("report-next").onclick = () => { state.weekOff++; renderReport(); };
 });
@@ -299,7 +304,7 @@ function renderWork() {
       <div class="chip-container"></div>
     `;
     const cont = card.querySelector(".chip-container");
-    temps[cat].forEach(t => {
+    (temps[cat] || []).forEach(t => {
       const chip = document.createElement("div");
       chip.className = "chip" + (dayData.tasks.includes(t) ? " active" : "");
       chip.textContent = t;
@@ -331,6 +336,7 @@ window.addInlineTask = (cat) => {
   const t = prompt("Neue Aufgabe für '" + cat + "':");
   if (t && t.trim()) {
     const temps = getData(KEY.workTemplates, {});
+    if (!temps[cat]) temps[cat] = [];
     temps[cat].push(t.trim());
     setData(KEY.workTemplates, temps);
     renderWork();
@@ -343,12 +349,14 @@ function renderSetupTemplates() {
   const t = getData(KEY.workTemplates, {});
   const sel = $("setup-category-select");
   if (!sel) return;
+  const currentVal = sel.value;
   sel.innerHTML = "";
   Object.keys(t).forEach(k => {
     const o = document.createElement("option");
     o.value = k; o.textContent = k;
     sel.appendChild(o);
   });
+  if (currentVal && t[currentVal]) sel.value = currentVal;
   if (sel.value) renderSetupTemplatesTaskList(sel.value);
   sel.onchange = (e) => renderSetupTemplatesTaskList(e.target.value);
 }
@@ -357,6 +365,7 @@ function renderSetupTemplatesTaskList(cat) {
   const list = $("setup-task-list");
   if (!list) return;
   list.innerHTML = "";
+  if (!cat) return;
   const t = getData(KEY.workTemplates, {});
   (t[cat] || []).forEach(x => {
     const r = document.createElement("div");
@@ -376,12 +385,14 @@ function renderSettingsTemplates() {
   const t = getData(KEY.workTemplates, {});
   const sel = $("settings-category-select");
   if (!sel) return;
+  const currentVal = sel.value;
   sel.innerHTML = "";
   Object.keys(t).forEach(k => {
     const o = document.createElement("option");
     o.value = k; o.textContent = k;
     sel.appendChild(o);
   });
+  if (currentVal && t[currentVal]) sel.value = currentVal;
   if (sel.value) renderSettingsTaskList(sel.value);
   sel.onchange = (e) => renderSettingsTaskList(e.target.value);
 }
@@ -390,12 +401,12 @@ function renderSettingsTaskList(cat) {
   const list = $("settings-task-list");
   if (!list) return;
   list.innerHTML = "";
+  if (!cat) return;
   const t = getData(KEY.workTemplates, {});
   
-  // Lösch-Button für den gesamten Bereich
   const delCatBtn = document.createElement("button");
   delCatBtn.className = "btn btn-danger";
-  delCatBtn.style = "margin-bottom: 15px; font-size: 0.8rem; padding: 8px;";
+  delCatBtn.style = "margin-bottom: 15px; font-size: 0.8rem; padding: 8px; width: 100%";
   delCatBtn.textContent = "Gesamten Bereich '" + cat + "' löschen";
   delCatBtn.onclick = () => {
     if(confirm("Diesen Bereich wirklich entfernen?")) {

@@ -1,11 +1,9 @@
 /* =========================================================
-   app.js — VOLLSTÄNDIGE ORIGINALVERSION (1000+ Zeilen)
+   app.js — VOLLSTÄNDIGE VERSION (Teil 1)
    ========================================================= */
 
 const SUPABASE_URL = "https://epeqhchtatxgninetvid.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwZXFoY2h0YXR4Z25pbmV0dmlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTIyNTIsImV4cCI6MjA4NDQyODI1Mn0.5yNc888ypwrAcUGvSZM8CfssRMbcovBFyltkSx6fErA";
-
-// FIX: Umbenennung zur Vermeidung von CDN-Konflikten
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
@@ -28,46 +26,30 @@ const state = {
 const $ = (id) => document.getElementById(id);
 const show = (el) => el && el.classList.remove("hidden");
 const hide = (el) => el && el.classList.add("hidden");
-
-const getData = (k, fb) => {
-  const v = localStorage.getItem(k);
-  if (!v) return fb;
-  try { return JSON.parse(v); } catch(e) { return fb; }
-};
+const getData = (k, fb) => JSON.parse(localStorage.getItem(k) || JSON.stringify(fb));
 const setData = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+const esc = (t) => { const d = document.createElement("div"); d.textContent = t; return d.innerHTML; };
 
-const esc = (t) => {
-  if (!t) return "";
-  const d = document.createElement("div");
-  d.textContent = t;
-  return d.innerHTML;
-};
-
+// App Start
 document.addEventListener("DOMContentLoaded", async () => {
   applyDark();
   
   const { data: { session } } = await supabaseClient.auth.getSession();
-  handleUser(session?.user);
+  handleAuthState(session?.user || null);
 
   supabaseClient.auth.onAuthStateChange((_event, session) => {
-    handleUser(session?.user);
+    handleAuthState(session?.user || null);
   });
 
   initEventListeners();
 });
 
-function applyDark() {
-  const isDark = getData(KEY.dark, true);
-  document.body.classList.toggle("light", !isDark);
-  if ($("dark-toggle")) $("dark-toggle").checked = isDark;
-}
-
-function handleUser(user) {
+function handleAuthState(user) {
   currentUser = user;
   if (!user) {
     show($("login-screen"));
-    hide($("setup-screen"));
     hide($("app-screen"));
+    hide($("setup-screen"));
   } else {
     hide($("login-screen"));
     if (!getData(KEY.setup, false)) {
@@ -76,117 +58,103 @@ function handleUser(user) {
       renderSetupTemplates();
     } else {
       show($("app-screen"));
-      renderAll();
-      switchTab(isSchoolDay() ? "school" : "work");
-      syncDown();
+      syncDown().then(() => {
+        renderAll();
+        switchTab(isSchoolDay() ? "school" : "work");
+      });
     }
   }
 }
+
+function applyDark() {
+  const isDark = getData(KEY.dark, true);
+  document.body.classList.toggle("light", !isDark);
+  if ($("dark-toggle")) $("dark-toggle").checked = isDark;
+}
+
 function initEventListeners() {
-  // Auth
-  if($("login-btn")) $("login-btn").onclick = async () => {
-    const email = $("login-email").value;
-    const password = $("login-pass").value;
-    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) alert("Login Fehler: " + error.message);
+  // Login
+  $("login-btn").onclick = async () => {
+    const { error } = await supabaseClient.auth.signInWithPassword({
+      email: $("login-email").value,
+      password: $("login-pass").value
+    });
+    if (error) alert("Fehler: " + error.message);
   };
 
-  if($("signup-btn")) $("signup-btn").onclick = async () => {
-    const email = $("login-email").value;
-    const password = $("login-pass").value;
-    const { error } = await supabaseClient.auth.signUp({ email, password });
-    if (error) alert("Registrierung Fehler: " + error.message);
-    else alert("Bestätigungs-Email prüfen!");
+  // Registrierung
+  $("signup-btn").onclick = async () => {
+    const { error } = await supabaseClient.auth.signUp({
+      email: $("login-email").value,
+      password: $("login-pass").value
+    });
+    if (error) alert(error.message); else alert("Bitte Email bestätigen!");
   };
 
-  // Navigation
+  // Tabs Navigation
   document.querySelectorAll(".tabbtn").forEach(btn => {
     btn.onclick = () => switchTab(btn.dataset.tab);
   });
 
-  // Kalender-Fix (Unsichtbares Feld über Icon)
-  if($("hidden-date-input")) $("hidden-date-input").onchange = (e) => {
-    if (e.target.value) {
-      state.selectedDate = e.target.value;
-      renderAll();
-      switchTab(isSchoolDay() ? "school" : "work");
+  // Datum ändern
+  $("hidden-date-input").onchange = (e) => {
+    state.selectedDate = e.target.value;
+    renderAll();
+    switchTab(isSchoolDay() ? "school" : "work");
+  };
+
+  // Setup Fächer
+  $("setup-add-subject").onclick = () => {
+    const v = $("setup-subject-input").value.trim();
+    if(v) { 
+      const s = getData(KEY.subjects, []); s.push(v); 
+      setData(KEY.subjects, s); $("setup-subject-input").value=""; renderSetup(); 
     }
   };
 
-  if($("open-settings")) $("open-settings").onclick = () => switchTab("settings");
+  $("setup-to-step-2").onclick = () => { hide($("setup-step-1")); show($("setup-step-2")); };
+  $("setup-to-step-3").onclick = () => { hide($("setup-step-2")); show($("setup-step-3")); renderSetupTemplates(); };
 
-  // Setup Step 1
-  if($("setup-add-subject")) $("setup-add-subject").onclick = () => {
-    const val = $("setup-subject-input").value.trim();
-    if (val) {
-      const list = getData(KEY.subjects, []);
-      list.push(val);
-      setData(KEY.subjects, list);
-      $("setup-subject-input").value = "";
-      renderSetup();
-    }
-  };
-
-  if($("setup-to-step-2")) $("setup-to-step-2").onclick = () => {
-    hide($("setup-step-1"));
-    show($("setup-step-2"));
-  };
-
-  if($("setup-to-step-3")) $("setup-to-step-3").onclick = () => {
-    hide($("setup-step-2"));
-    show($("setup-step-3"));
-    renderSetupTemplates();
-  };
-  // Setup Step 3 (Vorlagen & Kategorien)
-  if($("setup-add-category")) $("setup-add-category").onclick = () => {
-    const input = $("setup-category-input");
-    const cat = input.value.trim();
+  // Setup Kategorien & Aufgaben
+  $("setup-add-category").onclick = () => {
+    const cat = $("setup-category-input").value.trim();
     if (cat) {
       const t = getData(KEY.workTemplates, {});
       if (!t[cat]) t[cat] = [];
       setData(KEY.workTemplates, t);
-      input.value = "";
+      $("setup-category-input").value = "";
       renderSetupTemplates();
     }
   };
 
-  if($("setup-add-task")) $("setup-add-task").onclick = () => {
-    const sel = $("setup-category-select");
-    const cat = sel.value;
-    const taskInput = $("setup-task-input");
-    const task = taskInput.value.trim();
+  $("setup-add-task").onclick = () => {
+    const cat = $("setup-category-select").value;
+    const task = $("setup-task-input").value.trim();
     if (cat && task) {
       const t = getData(KEY.workTemplates, {});
-      if (!t[cat]) t[cat] = [];
       t[cat].push(task);
       setData(KEY.workTemplates, t);
-      taskInput.value = "";
+      $("setup-task-input").value = "";
       renderSetupTemplatesTaskList(cat);
     }
   };
 
-  if($("setup-finish")) $("setup-finish").onclick = () => {
+  $("setup-finish").onclick = () => {
     setData(KEY.setup, true);
     location.reload();
   };
 
-  // Report Navigation
-  if($("report-prev")) $("report-prev").onclick = () => { state.weekOff--; renderReport(); };
-  if($("report-next")) $("report-next").onclick = () => { state.weekOff++; renderReport(); };
-
-  // Settings
-  if($("dark-toggle")) $("dark-toggle").onchange = (e) => {
-    setData(KEY.dark, e.target.checked);
-    applyDark();
-  };
-
-  if($("reset-all")) $("reset-all").onclick = () => {
-    if(confirm("Alle lokalen Daten löschen?")) {
-      localStorage.clear();
-      location.reload();
-    }
-  };
+  // Einstellungen
+  $("dark-toggle").onchange = (e) => { setData(KEY.dark, e.target.checked); applyDark(); };
+  $("reset-all").onclick = () => { if(confirm("Alles löschen?")) { localStorage.clear(); location.reload(); } };
+  
+  // Berichts-Navigation
+  $("report-prev").onclick = () => { state.weekOff--; renderReport(); };
+  $("report-next").onclick = () => { state.weekOff++; renderReport(); };
 }
+/* =========================================================
+   app.js — VOLLSTÄNDIGE VERSION (Teil 2)
+   ========================================================= */
 
 function isSchoolDay() {
   const d = new Date(state.selectedDate).getDay();
@@ -197,9 +165,7 @@ function switchTab(t) {
   document.querySelectorAll(".tab-content").forEach(c => hide(c));
   const target = $("tab-" + t);
   if (target) show(target);
-  document.querySelectorAll(".tabbtn").forEach(b => {
-    b.classList.toggle("active", b.dataset.tab === t);
-  });
+  document.querySelectorAll(".tabbtn").forEach(b => b.classList.toggle("active", b.dataset.tab === t));
   if (t === "report") renderReport();
   updateTopbar();
 }
@@ -209,6 +175,7 @@ function updateTopbar() {
   const options = { weekday: 'short', day: '2-digit', month: '2-digit' };
   $("topbar-title").textContent = d.toLocaleDateString('de-DE', options);
 }
+
 function renderAll() {
   renderSchool();
   renderWork();
@@ -219,7 +186,7 @@ function renderSchool() {
   if(!list) return;
   list.innerHTML = "";
   if (!isSchoolDay()) {
-    list.innerHTML = "<div class='panel muted'>Kein Schultag.</div>";
+    list.innerHTML = "<div class='panel muted'>Kein Schultag laut Plan.</div>";
     return;
   }
   const entries = getData(KEY.school, {});
@@ -229,8 +196,7 @@ function renderSchool() {
   subjects.forEach(sub => {
     const card = document.createElement("div");
     card.className = "card";
-    card.innerHTML = `<div class="h3">${esc(sub)}</div>
-      <textarea class="textarea" placeholder="Was hast du gelernt?">${esc(dayData[sub] || "")}</textarea>`;
+    card.innerHTML = `<div class="h3">${esc(sub)}</div><textarea class="textarea" placeholder="..."> ${esc(dayData[sub] || "")}</textarea>`;
     card.querySelector("textarea").oninput = (e) => {
       dayData[sub] = e.target.value;
       entries[state.selectedDate] = dayData;
@@ -251,13 +217,19 @@ function renderWork() {
   }
   const entries = getData(KEY.work, {});
   const dayData = entries[state.selectedDate] || { tasks: [], note: "" };
-  const templates = getData(KEY.workTemplates, { "Basis": ["Kasse", "Lager", "Verkauf"] });
+  const templates = getData(KEY.workTemplates, { "Allgemein": [] });
 
   Object.keys(templates).forEach(cat => {
     const card = document.createElement("div");
     card.className = "card";
-    card.innerHTML = `<div class="h3">${esc(cat)}</div><div style="display:flex;flex-wrap:wrap;gap:8px;"></div>`;
-    const container = card.lastChild;
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div class="h3" style="margin:0;">${esc(cat)}</div>
+        <button class="btn-icon" style="font-size:1.2rem;" onclick="addNewTaskInline('${esc(cat)}')">+</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;" id="chips-${esc(cat)}"></div>
+    `;
+    const container = card.querySelector(`#chips-${cat}`);
     templates[cat].forEach(task => {
       const chip = document.createElement("div");
       chip.className = "chip" + (dayData.tasks.includes(task) ? " active" : "");
@@ -274,9 +246,11 @@ function renderWork() {
     });
     list.appendChild(card);
   });
-  if($("work-note")) {
-    $("work-note").value = dayData.note || "";
-    $("work-note").oninput = (e) => {
+  
+  const noteArea = $("work-note");
+  if(noteArea) {
+    noteArea.value = dayData.note || "";
+    noteArea.oninput = (e) => {
       dayData.note = e.target.value;
       entries[state.selectedDate] = dayData;
       setData(KEY.work, entries);
@@ -284,82 +258,86 @@ function renderWork() {
     };
   }
 }
+
+// NEU: Direktes Hinzufügen im Arbeitstab
+window.addNewTaskInline = (cat) => {
+  const newTask = prompt("Neue Tätigkeit für " + cat + ":");
+  if (newTask) {
+    const t = getData(KEY.workTemplates, {});
+    if (!t[cat]) t[cat] = [];
+    t[cat].push(newTask);
+    setData(KEY.workTemplates, t);
+    renderWork();
+    saveDB();
+  }
+};
+
 function renderReport() {
   const d = new Date(state.selectedDate);
   const monday = new Date(d.setDate(d.getDate() - (d.getDay() || 7) + 1 + (state.weekOff * 7)));
-  $("report-week-label").textContent = "Woche ab " + monday.toLocaleDateString();
-
-  let schoolText = "";
-  let workTasks = new Set();
-  const schoolEntries = getData(KEY.school, {});
-  const workEntries = getData(KEY.work, {});
-
+  $("report-week-label").textContent = "Woche ab " + monday.toLocaleDateString('de-DE');
+  
+  let sText = ""; let wTasks = new Set();
+  const sEntries = getData(KEY.school, {}); 
+  const wEntries = getData(KEY.work, {});
+  
   for (let i = 0; i < 5; i++) {
-    const current = new Date(monday);
-    current.setDate(current.getDate() + i);
-    const iso = current.toISOString().split("T")[0];
-    if (schoolEntries[iso]) {
-      Object.entries(schoolEntries[iso]).forEach(([sub, val]) => { if (val) schoolText += `${sub}: ${val}\n`; });
+    const curr = new Date(monday); 
+    curr.setDate(curr.getDate() + i);
+    const iso = curr.toISOString().split("T")[0];
+    if (sEntries[iso]) {
+        Object.entries(sEntries[iso]).forEach(([s,v]) => { if(v) sText += s + ": " + v + "\n"; });
     }
-    if (workEntries[iso]) { workEntries[iso].tasks.forEach(t => workTasks.add(t)); }
+    if (wEntries[iso]) {
+        wEntries[iso].tasks.forEach(t => wTasks.add(t));
+    }
   }
-  $("report-draft-school").value = schoolText.trim() || "Keine Einträge.";
-  $("report-draft-work").value = workTasks.size > 0 ? Array.from(workTasks).join(", ") : "Keine Aufgaben.";
+  $("report-draft-school").value = sText.trim() || "Keine Einträge";
+  $("report-draft-work").value = wTasks.size > 0 ? Array.from(wTasks).join(", ") : "Keine Aufgaben";
 }
 
 function renderSetup() {
-  const list = $("setup-subject-list");
-  if(!list) return;
-  list.innerHTML = "";
-  getData(KEY.subjects, []).forEach(s => {
-    const c = document.createElement("div"); c.className = "chip"; c.textContent = s; list.appendChild(c);
+  const list = $("setup-subject-list"); list.innerHTML = "";
+  getData(KEY.subjects, []).forEach(s => { 
+    const c = document.createElement("div"); c.className = "chip"; c.textContent = s; list.appendChild(c); 
   });
-  const grid = $("setup-schooldays");
-  if(!grid) return;
-  grid.innerHTML = "";
-  const names = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  const grid = $("setup-schooldays"); grid.innerHTML = "";
+  const names = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"]; 
   const days = getData(KEY.days, [1, 2]);
   names.forEach((name, i) => {
-    const b = document.createElement("button");
-    b.className = "weekday" + (days.includes(i) ? " active" : "");
+    const b = document.createElement("button"); 
+    b.className = "weekday" + (days.includes(i) ? " active" : ""); 
     b.textContent = name;
-    b.onclick = () => {
-      let d = getData(KEY.days, [1, 2]);
-      d = d.includes(i) ? d.filter(x => x !== i) : [...d, i];
-      setData(KEY.days, d);
-      renderSetup();
+    b.onclick = () => { 
+      let d = getData(KEY.days, [1, 2]); 
+      d = d.includes(i) ? d.filter(x => x !== i) : [...d, i]; 
+      setData(KEY.days, d); renderSetup(); 
     };
     grid.appendChild(b);
   });
 }
 
 function renderSetupTemplates() {
-  const t = getData(KEY.workTemplates, {});
-  const sel = $("setup-category-select");
-  if (!sel) return;
-  sel.innerHTML = "";
-  Object.keys(t).forEach(c => {
-    const o = document.createElement("option"); o.value = c; o.textContent = c; sel.appendChild(o);
+  const t = getData(KEY.workTemplates, {}); const sel = $("setup-category-select"); if(!sel) return;
+  sel.innerHTML = ""; 
+  Object.keys(t).forEach(c => { 
+    const o = document.createElement("option"); o.value = c; o.textContent = c; sel.appendChild(o); 
   });
-  if (sel.value) renderSetupTemplatesTaskList(sel.value);
+  if(sel.value) renderSetupTemplatesTaskList(sel.value);
   sel.onchange = (e) => renderSetupTemplatesTaskList(e.target.value);
 }
 
 function renderSetupTemplatesTaskList(cat) {
-  const list = $("setup-task-list");
-  if (!list) return;
-  list.innerHTML = "";
-  const t = getData(KEY.workTemplates, {});
+  const list = $("setup-task-list"); list.innerHTML = ""; const t = getData(KEY.workTemplates, {});
   (t[cat] || []).forEach(task => {
-    const div = document.createElement("div");
-    div.style = "display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid var(--line);";
-    div.innerHTML = `<span>${esc(task)}</span><span style="color:var(--danger); cursor:pointer;">✕</span>`;
-    div.lastChild.onclick = () => {
-      t[cat] = t[cat].filter(x => x !== task);
-      setData(KEY.workTemplates, t);
-      renderSetupTemplatesTaskList(cat);
+    const d = document.createElement("div"); 
+    d.style = "display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid var(--line);";
+    d.innerHTML = `<span>${esc(task)}</span><span style="color:var(--danger);cursor:pointer">✕</span>`;
+    d.lastChild.onclick = () => { 
+      t[cat] = t[cat].filter(x => x !== task); 
+      setData(KEY.workTemplates, t); renderSetupTemplatesTaskList(cat); 
     };
-    list.appendChild(div);
+    list.appendChild(d);
   });
 }
 
@@ -367,10 +345,10 @@ async function saveDB() {
   if (!currentUser) return;
   const day = state.selectedDate;
   await supabaseClient.from("day_entries").upsert({
-    user_id: currentUser.id,
-    day: day,
+    user_id: currentUser.id, 
+    day: day, 
     school: getData(KEY.school, {})[day] || {},
-    work: getData(KEY.work, {})[day] || { tasks: [], note: "" },
+    work: getData(KEY.work, {})[day] || { tasks: [], note: "" }, 
     updated_at: new Date().toISOString()
   });
 }
@@ -379,8 +357,10 @@ async function syncDown() {
   if (!currentUser) return;
   const { data, error } = await supabaseClient.from("day_entries").select("*").eq("user_id", currentUser.id);
   if (data) {
-    const s = getData(KEY.school, {}), w = getData(KEY.work, {});
+    const s = getData(KEY.school, {}); 
+    const w = getData(KEY.work, {});
     data.forEach(e => { s[e.day] = e.school; w[e.day] = e.work; });
-    setData(KEY.school, s); setData(KEY.work, w); renderAll();
+    setData(KEY.school, s); 
+    setData(KEY.work, w);
   }
 }

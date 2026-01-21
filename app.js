@@ -6,7 +6,14 @@
 // --- KONFIGURATION ---
 const SUPABASE_URL = "https://epeqhchtatxgninetvid.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwZXFoY2h0YXR4Z25pbmV0dmlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTIyNTIsImV4cCI6MjA4NDQyODI1Mn0.5yNc888ypwrAcUGvSZM8CfssRMbcovBFyltkSx6fErA";
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Sicherstellen, dass supabase geladen ist, bevor der Client erstellt wird
+let supabaseClient;
+try {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch (e) {
+  console.error("Supabase konnte nicht initialisiert werden:", e);
+}
 
 // --- STATE & KEYS ---
 let currentUser = null;
@@ -29,12 +36,26 @@ const state = {
 const $ = (id) => document.getElementById(id);
 const hide = (el) => el && el.classList.add("hidden");
 const show = (el) => el && el.classList.remove("hidden");
-const getData = (k, fb) => JSON.parse(localStorage.getItem(k) || JSON.stringify(fb));
+const getData = (k, fb) => {
+  try {
+    const item = localStorage.getItem(k);
+    return item ? JSON.parse(item) : fb;
+  } catch (e) {
+    return fb;
+  }
+};
 const setData = (k, v) => localStorage.setItem(k, JSON.stringify(v));
-const esc = (t) => { const d = document.createElement("div"); d.textContent = t; return d.innerHTML; };
+const esc = (t) => { 
+  if (!t) return "";
+  const d = document.createElement("div"); 
+  d.textContent = t; 
+  return d.innerHTML; 
+};
 
 // --- AUTHENTIFIZIERUNG ---
 async function initAuth() {
+  if (!supabaseClient) return;
+  
   const { data: { session } } = await supabaseClient.auth.getSession();
   handleUser(session?.user || null);
 
@@ -133,7 +154,6 @@ document.addEventListener("DOMContentLoaded", () => {
           setData(KEY.workTemplates, t);
           $("setup-category-input").value = "";
           renderSetupTemplates();
-          // Setze das Dropdown direkt auf den neuen Bereich
           if ($("setup-category-select")) $("setup-category-select").value = cat;
           renderSetupTemplatesTaskList(cat);
         }
@@ -483,7 +503,7 @@ function renderSetup() {
 
 // --- CLOUD SYNC ---
 async function saveEntry() {
-  if (!currentUser) return;
+  if (!currentUser || !supabaseClient) return;
   const day = state.selectedDate;
   await supabaseClient.from("day_entries").upsert({
     user_id: currentUser.id,
@@ -494,7 +514,7 @@ async function saveEntry() {
 }
 
 async function saveConfig() {
-  if (!currentUser) return;
+  if (!currentUser || !supabaseClient) return;
   await supabaseClient.from("user_configs").upsert({
     user_id: currentUser.id,
     subjects: getData(KEY.subjects, []),
@@ -504,17 +524,23 @@ async function saveConfig() {
 }
 
 async function syncDown() {
-  if (!currentUser) return;
-  const { data: entries } = await supabaseClient.from("day_entries").select("*").eq("user_id", currentUser.id);
-  if (entries) {
-    const s = getData(KEY.school, {}); const w = getData(KEY.work, {});
-    entries.forEach(e => { s[e.day] = e.school; w[e.day] = e.work; });
-    setData(KEY.school, s); setData(KEY.work, w);
-  }
-  const { data: config } = await supabaseClient.from("user_configs").select("*").eq("user_id", currentUser.id).maybeSingle();
-  if (config) {
-    setData(KEY.subjects, config.subjects);
-    setData(KEY.days, config.schooldays);
-    setData(KEY.workTemplates, config.templates);
+  if (!currentUser || !supabaseClient) return;
+  
+  try {
+    const { data: entries, error: e1 } = await supabaseClient.from("day_entries").select("*").eq("user_id", currentUser.id);
+    if (!e1 && entries) {
+      const s = getData(KEY.school, {}); const w = getData(KEY.work, {});
+      entries.forEach(e => { s[e.day] = e.school; w[e.day] = e.work; });
+      setData(KEY.school, s); setData(KEY.work, w);
+    }
+    
+    const { data: config, error: e2 } = await supabaseClient.from("user_configs").select("*").eq("user_id", currentUser.id).maybeSingle();
+    if (!e2 && config) {
+      setData(KEY.subjects, config.subjects || []);
+      setData(KEY.days, config.schooldays || [1, 2]);
+      setData(KEY.workTemplates, config.templates || {});
+    }
+  } catch (e) {
+    console.error("Fehler beim SyncDown:", e);
   }
 }

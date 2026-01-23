@@ -1,11 +1,12 @@
 /**
- * app.js – Vollständige Logik für Berichtsheft Pro
+ * app.js – Vollständige Logik für Berichtsheft Pro
  *
- * Diese Version behebt die Feldnamen für Supabase (school_days und work_templates)
- * und erweitert die Einstellungen so, dass Fächer, Schultage, Arbeitsbereiche
- * und Aufgaben nachträglich bearbeitet werden können. Benutzer können so die
- * gleichen Optionen wie im Setup nutzen, auch wenn die Ersteinrichtung bereits
- * abgeschlossen ist.
+ * Fixes in dieser Version:
+ * 1) Aufgaben-Auswahl pro Bereich eindeutig: speichert jetzt als "Bereich|Aufgabe".
+ *    Dadurch wird z.B. "Überarbeiten" in Bereich A nicht mehr automatisch in Bereich B mit ausgewählt.
+ *    Zusätzlich: Migration alter Einträge ohne "|" -> "legacy|...".
+ * 2) Tag löschen: Handler ist korrekt INSIDE DOMContentLoaded und löscht lokal + Supabase.
+ * 3) Report: zeigt im Bericht nur den Aufgaben-Namen (Teil nach "|").
  */
 
 // --- KONFIGURATION ---
@@ -74,8 +75,8 @@ async function initAuth() {
     const { data: { session }, error } = await supabaseClient.auth.getSession();
     if (error) throw error;
     handleUser(session?.user || null);
-    supabaseClient.auth.onAuthStateChange((_event, session) => {
-      handleUser(session?.user || null);
+    supabaseClient.auth.onAuthStateChange((_event, session2) => {
+      handleUser(session2?.user || null);
     });
   } catch (err) {
     console.log("Auth Fehler oder Offline.");
@@ -135,9 +136,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.onclick = () => switchTab(btn.dataset.tab);
   });
 
-  // Date Picker – das Eingabefeld liegt unsichtbar über dem Datumstext.
-  // Auf Mobilgeräten öffnet das Overlay den Picker automatisch; hier reagieren
-  // wir nur auf die Änderung des Datums.
+  // Date Picker – reagiert auf Änderung
   const dateInput = $("hidden-date-input");
   if (dateInput) {
     dateInput.onchange = (e) => {
@@ -200,21 +199,14 @@ document.addEventListener("DOMContentLoaded", () => {
   // Logout und Reset
   if ($("logout-btn")) {
     $("logout-btn").onclick = async () => {
-      // Abmelden: Auth-Session entfernen, aber nicht unsere Supabase-Key im localStorage löschen.
       await supabaseClient.auth.signOut();
-      // Lösche nur app-spezifische Daten
       Object.values(KEY).forEach(k => localStorage.removeItem(k));
-      // Optional: entferne den Supabase-Key, wenn du beim nächsten Start wieder gefragt werden möchtest.
-      // localStorage.removeItem('supabaseKey');
       location.reload();
     };
   }
   if ($("reset-all")) {
     $("reset-all").onclick = () => {
-      // Lokale Daten für die App löschen, aber den Supabase-Session-Token nicht löschen,
-      // damit der Benutzer angemeldet bleibt.
       Object.values(KEY).forEach(k => localStorage.removeItem(k));
-      // Supabase-Key und Supabase-Session bleiben erhalten.
       location.reload();
     };
   }
@@ -242,7 +234,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!temps[val]) temps[val] = [];
         setData(KEY.workTemplates, temps);
         $("settings-category-input").value = "";
-        // Nach dem Hinzufügen eines neuen Bereichs diesen direkt auswählen
         renderSettingsCategories(val);
         renderWork();
         saveConfig();
@@ -260,8 +251,6 @@ document.addEventListener("DOMContentLoaded", () => {
         temps[cat].push(val);
         setData(KEY.workTemplates, temps);
         $("settings-task-input").value = "";
-        // Nach dem Hinzufügen einer neuen Aufgabe die aktuelle Kategorie beibehalten
-        // und nur die Aufgabenliste neu rendern
         renderSettingsTasks(cat);
         renderWork();
         saveConfig();
@@ -289,6 +278,32 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
   }
+
+  // Tag löschen (Topbar) – korrekt im DOMContentLoaded
+  if ($("delete-day")) {
+    $("delete-day").onclick = async () => {
+      if (!currentUser) return;
+      const day = state.selectedDate;
+      if (!day) return;
+
+      if (!window.confirm("Möchtest du den Eintrag für den ausgewählten Tag löschen?")) return;
+
+      const sEntries = getData(KEY.school, {});
+      const wEntries = getData(KEY.work, {});
+      delete sEntries[day];
+      delete wEntries[day];
+      setData(KEY.school, sEntries);
+      setData(KEY.work, wEntries);
+
+      try {
+        await supabaseClient.from("day_entries").delete().eq("user_id", currentUser.id).eq("day", day);
+      } catch (err) {
+        console.error("Fehler beim Löschen des Tages:", err);
+      }
+
+      renderAll();
+    };
+  }
 });
 
 // --- CLOUD SYNC ---
@@ -310,8 +325,6 @@ async function saveEntry() {
 async function saveConfig() {
   if (!currentUser || !supabaseClient) return;
   try {
-    // Die Supabase-Tabelle user_config verwendet nur die Spalten school_days und work_templates.
-    // Wir senden ausschließlich diese Spalten, um 400‑Fehler durch unbekannte Felder zu vermeiden.
     await supabaseClient.from("user_config").upsert({
       user_id: currentUser.id,
       subjects: getData(KEY.subjects, []),
@@ -330,6 +343,7 @@ async function syncDown() {
       supabaseClient.from("day_entries").select("*").eq("user_id", currentUser.id),
       supabaseClient.from("user_config").select("*").eq("user_id", currentUser.id)
     ]);
+
     if (entriesRes.data && entriesRes.data.length > 0) {
       const s = {}; const w = {};
       entriesRes.data.forEach(e => { s[e.day] = e.school; w[e.day] = e.work; });
@@ -337,9 +351,9 @@ async function syncDown() {
       setData(KEY.work, w);
       console.log("Cloud-Einträge geladen.");
     }
+
     if (configRes.data && configRes.data.length > 0) {
       const c = configRes.data[0];
-      // unterstütze sowohl neue als auch alte Spaltennamen
       const schoolDaysVal = c.school_days ? c.school_days : (c.schooldays ? c.schooldays : [1, 2]);
       const templatesVal = c.work_templates ? c.work_templates : (c.templates ? c.templates : {});
       setData(KEY.subjects, c.subjects || []);
@@ -348,7 +362,6 @@ async function syncDown() {
       setData(KEY.setup, true);
       console.log("Cloud-Config geladen.");
     } else {
-      // Wenn keine Cloud-Konfiguration existiert, Setup-FLAG nicht setzen
       if (localStorage.getItem(KEY.setup) === null) {
         setData(KEY.setup, false);
       }
@@ -395,17 +408,21 @@ function renderSchool() {
   const list = $("school-list");
   if (!list) return;
   list.innerHTML = "";
+
   if (!isSchoolDay()) {
     list.innerHTML = "<div class='panel muted' style='text-align:center'>Kein Schultag laut Einstellung.</div>";
     return;
   }
+
   const entries = getData(KEY.school, {});
   const dayData = entries[state.selectedDate] || {};
   const subs = getData(KEY.subjects, []);
+
   if (subs.length === 0) {
     list.innerHTML = "<div class='panel muted' style='text-align:center'>Fächer-Liste ist leer. Bitte im Setup hinzufügen.</div>";
     return;
   }
+
   subs.forEach(sub => {
     const card = document.createElement("div");
     card.className = "panel";
@@ -420,41 +437,75 @@ function renderSchool() {
   });
 }
 
+// --- WICHTIG: Fix für Aufgaben pro Bereich eindeutig ---
 function renderWork() {
   const list = $("work-list");
   if (!list) return;
   list.innerHTML = "";
+
   if (isSchoolDay()) {
     list.innerHTML = "<div class='panel muted' style='text-align:center'>Heute ist Berufsschule.</div>";
     return;
   }
+
   const entries = getData(KEY.work, {});
   const dayData = entries[state.selectedDate] || { tasks: [], note: "" };
+
+  // Migration: alte Einträge ohne "|" -> legacy|...
+  if (Array.isArray(dayData.tasks)) {
+    let changed = false;
+    dayData.tasks = dayData.tasks.map(x => {
+      if (typeof x === "string" && !x.includes("|")) {
+        changed = true;
+        return `legacy|${x}`;
+      }
+      return x;
+    });
+    if (changed) {
+      entries[state.selectedDate] = dayData;
+      setData(KEY.work, entries);
+      saveEntry();
+    }
+  } else {
+    dayData.tasks = [];
+  }
+
   const temps = getData(KEY.workTemplates, {});
   const categories = Object.keys(temps);
+
   if (categories.length === 0) {
     list.innerHTML = "<div class='panel muted' style='text-align:center'>Keine Tätigkeitsbereiche im Setup angelegt.</div>";
   }
+
   categories.forEach(cat => {
     const card = document.createElement("div");
     card.className = "panel";
     card.innerHTML = `<div class="h3">${esc(cat)}</div><div class="chip-container"></div>`;
     const cont = card.querySelector(".chip-container");
+
     (temps[cat] || []).forEach(t => {
+      const key = `${cat}|${t}`;
       const chip = document.createElement("div");
-      chip.className = "chip" + (dayData.tasks.includes(t) ? " active" : "");
+      chip.className = "chip" + (dayData.tasks.includes(key) ? " active" : "");
       chip.textContent = t;
+
       chip.onclick = () => {
-        dayData.tasks = dayData.tasks.includes(t) ? dayData.tasks.filter(x => x !== t) : [...dayData.tasks, t];
+        const idx = dayData.tasks.indexOf(key);
+        if (idx >= 0) dayData.tasks.splice(idx, 1);
+        else dayData.tasks.push(key);
+
         entries[state.selectedDate] = dayData;
         setData(KEY.work, entries);
         renderWork();
         saveEntry();
       };
+
       cont.appendChild(chip);
     });
+
     list.appendChild(card);
   });
+
   const notePanel = document.createElement("div");
   notePanel.className = "panel";
   notePanel.innerHTML = `<div class="h3">Zusätzliche Notizen</div><textarea class="input" placeholder="Sonstiges...">${esc(dayData.note || "")}</textarea>`;
@@ -486,6 +537,7 @@ function renderSetup() {
       list.appendChild(c);
     });
   }
+
   // Schritt 2: Schultage
   const grid = $("setup-schooldays");
   if (grid) {
@@ -505,6 +557,7 @@ function renderSetup() {
       grid.appendChild(b);
     });
   }
+
   // Schritt 3: Arbeitsbereiche
   const catSelect = $("setup-category-select");
   if (catSelect) {
@@ -517,10 +570,9 @@ function renderSetup() {
       o.textContent = c;
       catSelect.appendChild(o);
     });
-    catSelect.onchange = () => {
-      renderSetup();
-    };
+    catSelect.onchange = () => renderSetup();
   }
+
   const taskList = $("setup-task-list");
   if (taskList && catSelect) {
     taskList.innerHTML = "";
@@ -591,19 +643,12 @@ function renderSettingsSchoolDays() {
   });
 }
 
-/*
- * Rendert die Liste der Arbeitsbereiche und initialisiert das Dropdown.
- * Die aktuell ausgewählte Kategorie wird beibehalten, wenn vorhanden.
- * Nach dem Anlegen oder Löschen von Aufgaben wird die aktuell ausgewählte
- * Kategorie erneut selektiert und die Aufgabenliste aktualisiert.
- */
 function renderSettingsCategories(selectedCat) {
   const select = $("settings-category-select");
   if (!select) return;
   const temps = getData(KEY.workTemplates, {});
   const categories = Object.keys(temps);
 
-  // Fülle das Dropdown neu
   select.innerHTML = "";
   categories.forEach(c => {
     const opt = document.createElement("option");
@@ -612,40 +657,33 @@ function renderSettingsCategories(selectedCat) {
     select.appendChild(opt);
   });
 
-  // Wähle die gewünschte Kategorie aus oder setze auf die erste
   if (selectedCat && categories.includes(selectedCat)) {
     select.value = selectedCat;
   } else if (select.value && categories.includes(select.value)) {
-    // nothing to change
+    // keep
   } else if (categories.length > 0) {
     select.value = categories[0];
   }
 
-  // Bei Änderung der Kategorie nur die Aufgaben neu rendern
   select.onchange = () => {
     renderSettingsTasks(select.value);
   };
 
-  // Rendere die Aufgaben der aktuellen Kategorie
   renderSettingsTasks(select.value);
 }
 
-/*
- * Rendert die Aufgabenliste für die übergebene Kategorie im Einstellungs‑Tab.
- */
 function renderSettingsTasks(cat) {
   const listDiv = $("settings-task-list");
   if (!listDiv) return;
   listDiv.innerHTML = "";
   const temps = getData(KEY.workTemplates, {});
   if (!cat || !temps[cat]) return;
+
   temps[cat].forEach((task) => {
     const chip = document.createElement("div");
     chip.className = "chip active";
     chip.textContent = task;
     chip.onclick = () => {
-      // Kategorie zwischenspeichern, damit sie nach dem Löschen der Aufgabe
-      // weiterhin ausgewählt bleibt
       const currentCat = cat;
       temps[currentCat] = temps[currentCat].filter(x => x !== task);
       setData(KEY.workTemplates, temps);
@@ -661,47 +699,32 @@ function renderReport() {
   const d = new Date(state.selectedDate);
   const mon = new Date(d.setDate(d.getDate() - (d.getDay() || 7) + 1 + (state.weekOff * 7)));
   if ($("report-week-label")) $("report-week-label").textContent = "Woche ab " + mon.toLocaleDateString('de-DE');
+
   let sText = "";
   let wSet = new Set();
   const sE = getData(KEY.school, {});
   const wE = getData(KEY.work, {});
+
   for (let i = 0; i < 5; i++) {
     const cur = new Date(mon);
     cur.setDate(cur.getDate() + i);
     const iso = cur.toISOString().split("T")[0];
+
     if (sE[iso]) {
       Object.entries(sE[iso]).forEach(([k, v]) => {
-        if (v) sText += k + ": " + v + "\\n";
+        if (v) sText += k + ": " + v + "\n";
       });
     }
-    if (wE[iso]?.tasks) wE[iso].tasks.forEach(t => wSet.add(t));
+
+    // FIX: wenn Aufgaben als "Bereich|Aufgabe" gespeichert sind, im Bericht nur den Namen übernehmen
+    if (wE[iso]?.tasks) {
+      wE[iso].tasks.forEach(item => {
+        const name = (typeof item === "string" && item.includes("|")) ? item.split("|")[1] : item;
+        if (name) wSet.add(name);
+      });
+    }
   }
+
   if ($("report-draft-school")) $("report-draft-school").value = sText.trim();
   if ($("report-draft-work")) $("report-draft-work").value = Array.from(wSet).join(", ");
-}
-
-
-// Im DOMContentLoaded-Handler, nach den Report-Buttons:
-if ($("delete-day")) {
-  $("delete-day").onclick = async () => {
-    if (!currentUser) return;
-    const day = state.selectedDate;
-    if (!day) return;
-    // Sicherheitsabfrage: Nutzer muss bestätigen
-    if (!window.confirm("Möchtest du den Eintrag für den ausgewählten Tag löschen?")) return;
-    // Lokale Einträge entfernen
-    const sEntries = getData(KEY.school, {});
-    const wEntries = getData(KEY.work, {});
-    delete sEntries[day];
-    delete wEntries[day];
-    setData(KEY.school, sEntries);
-    setData(KEY.work, wEntries);
-    // Eintrag in der Supabase-Tabelle löschen
-    try {
-      await supabaseClient.from("day_entries").delete().eq("user_id", currentUser.id).eq("day", day);
-    } catch (err) {
-      console.error("Fehler beim Löschen des Tages:", err);
-    }
-    renderAll();
-  };
 }

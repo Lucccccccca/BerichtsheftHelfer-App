@@ -7,6 +7,38 @@
   <link rel="manifest" href="./manifest.json" />
   <meta name="theme-color" content="#0b0f16" />
   <link rel="stylesheet" href="./style.css" />
+
+  <!-- Eigene Stile für Chips und Layout-Anpassungen -->
+  <style>
+    /* Chips mit mehr Abstand und abgerundeten Ecken */
+    .chip {
+      display: inline-block;
+      padding: 6px 12px;
+      margin: 4px;
+      border-radius: 12px;
+      background-color: #3949ab; /* dunkles Blau als Standardfarbe */
+      color: #fff;
+      font-size: 0.85rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .chip.active {
+      background-color: #1e3799; /* etwas dunkler für aktive Chips */
+    }
+    .chip-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    /* Verbesserte Darstellung des Aufgabenbereichs in den Tabs */
+    #work-list .panel {
+      margin-bottom: 12px;
+    }
+    /* Kleinere Anpassungen für Buttons im Tab-Bereich */
+    .tabs button span {
+      font-size: 0.85rem;
+    }
+  </style>
 </head>
 <body>
   <!-- LOGIN SCREEN -->
@@ -71,7 +103,8 @@
     <div class="topbar">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div id="date-display" style="font-weight:800; font-size:1.1rem; cursor:pointer;">Datum wählen</div>
-        <input type="date" id="hidden-date-input" style="display:none;" />
+        <!-- Das Datumsfeld muss sichtbar im DOM bleiben, damit showPicker() auch auf Mobilgeräten funktioniert. -->
+        <input type="date" id="hidden-date-input" style="position:absolute; left:-9999px; width:0; height:0; opacity:0;" />
       </div>
     </div>
     <div class="content" style="padding-bottom:90px;">
@@ -143,7 +176,8 @@
       </button>
       <button class="tabbtn" data-tab="report">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-        <span>Report</span>
+        <!-- Label des Report‑Tabs auf Deutsch -->
+        <span>Bericht</span>
       </button>
       <button class="tabbtn" data-tab="settings">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09a1.65 1.65 0 0 0 1.51-1z"></path></svg>
@@ -151,7 +185,9 @@
       </button>
     </div>
   </div>
+  <!-- Lade zuerst die Supabase-Bibliothek, dann die Umgebungsvariablen und zum Schluss die App-Logik -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./env.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

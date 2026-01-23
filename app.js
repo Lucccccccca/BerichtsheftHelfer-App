@@ -9,10 +9,11 @@
  */
 
 // --- KONFIGURATION ---
-const SUPABASE_URL = "https://epeqhchtatxgninetvid.supabase.co";
-// Hinweis: Der API‑Schlüssel muss vom Benutzer eingefügt werden. Ohne gültigen Schlüssel
-// funktioniert die Anmeldung nicht.
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwZXFoY2h0YXR4Z25pbmV0dmlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTIyNTIsImV4cCI6MjA4NDQyODI1Mn0.5yNc888ypwrAcUGvSZM8CfssRMbcovBFyltkSx6fErA";
+// Die Zugangsdaten für Supabase werden bevorzugt aus einer externen Datei env.js gelesen.
+// In env.js sollte ein Objekt window.env mit den Feldern SUPABASE_URL und SUPABASE_KEY definiert werden.
+// Falls keine Werte vorhanden sind, greifen wir auf LocalStorage zurück oder verwenden einen Platzhalter.
+const SUPABASE_URL = window.env.SUPABASE_URL;
+const SUPABASE_KEY = window.env.SUPABASE_KEY;
 
 // Supabase‑Client Instanz
 let supabaseClient = null;
@@ -136,7 +137,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const dateDisplay = $("date-display");
   const dateInput = $("hidden-date-input");
   if (dateDisplay && dateInput) {
-    dateDisplay.onclick = () => dateInput.showPicker();
+    // Datepicker öffnen: showPicker() wenn verfügbar; ansonsten fallback auf click()
+    dateDisplay.onclick = () => {
+      try {
+        if (typeof dateInput.showPicker === "function") {
+          dateInput.showPicker();
+        } else {
+          // Fallback: Fokus setzen und Click auslösen (für iOS / ältere Browser)
+          dateInput.focus();
+          dateInput.click();
+        }
+      } catch (e) {
+        // Fallback falls showPicker() fehlschlägt oder das Feld versteckt ist
+        dateInput.focus();
+        dateInput.click();
+      }
+    };
     dateInput.onchange = (e) => {
       state.selectedDate = e.target.value;
       renderAll();
@@ -194,14 +210,21 @@ document.addEventListener("DOMContentLoaded", () => {
   // Logout und Reset
   if ($("logout-btn")) {
     $("logout-btn").onclick = async () => {
+      // Abmelden: Auth-Session entfernen, aber nicht unsere Supabase-Key im localStorage löschen.
       await supabaseClient.auth.signOut();
-      localStorage.clear();
+      // Lösche nur app-spezifische Daten
+      Object.values(KEY).forEach(k => localStorage.removeItem(k));
+      // Optional: entferne den Supabase-Key, wenn du beim nächsten Start wieder gefragt werden möchtest.
+      // localStorage.removeItem('supabaseKey');
       location.reload();
     };
   }
   if ($("reset-all")) {
     $("reset-all").onclick = () => {
-      localStorage.clear();
+      // Lokale Daten für die App löschen, aber den Supabase-Session-Token nicht löschen,
+      // damit der Benutzer angemeldet bleibt.
+      Object.values(KEY).forEach(k => localStorage.removeItem(k));
+      // Supabase-Key und Supabase-Session bleiben erhalten.
       location.reload();
     };
   }
@@ -255,7 +278,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if ($("report-prev")) $("report-prev").onclick = () => { state.weekOff--; renderReport(); };
   if ($("report-next")) $("report-next").onclick = () => { state.weekOff++; renderReport(); };
 });
-
 // --- CLOUD SYNC ---
 async function saveEntry() {
   if (!currentUser || !supabaseClient) return;
@@ -275,16 +297,13 @@ async function saveEntry() {
 async function saveConfig() {
   if (!currentUser || !supabaseClient) return;
   try {
-    // Wir speichern sowohl die neuen (school_days, work_templates) als auch die alten Feldnamen
-    // (schooldays, templates) ab, damit ältere Versionen der Datenbank weiterhin funktionieren.
+    // Die Supabase-Tabelle user_config verwendet nur die Spalten school_days und work_templates.
+    // Wir senden ausschließlich diese Spalten, um 400‑Fehler durch unbekannte Felder zu vermeiden.
     await supabaseClient.from("user_config").upsert({
       user_id: currentUser.id,
       subjects: getData(KEY.subjects, []),
       school_days: getData(KEY.days, [1, 2]),
-      work_templates: getData(KEY.workTemplates, {}),
-      // alte Feldnamen als Fallback
-      schooldays: getData(KEY.days, [1, 2]),
-      templates: getData(KEY.workTemplates, {})
+      work_templates: getData(KEY.workTemplates, {})
     }, { onConflict: 'user_id' });
   } catch (e) {
     console.error("SaveConfig Error:", e);
@@ -606,7 +625,7 @@ function renderReport() {
     const iso = cur.toISOString().split("T")[0];
     if (sE[iso]) {
       Object.entries(sE[iso]).forEach(([k, v]) => {
-        if (v) sText += k + ": " + v + "\n";
+        if (v) sText += k + ": " + v + "\\n";
       });
     }
     if (wE[iso]?.tasks) wE[iso].tasks.forEach(t => wSet.add(t));

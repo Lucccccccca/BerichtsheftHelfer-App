@@ -8,7 +8,6 @@
   <meta name="theme-color" content="#0b0f16" />
   <link rel="stylesheet" href="./style.css" />
 
-  <!-- Eigene Stile für Chips und Layout-Anpassungen -->
   <style>
     /* Chips mit mehr Abstand und abgerundeten Ecken */
     .chip {
@@ -16,31 +15,26 @@
       padding: 6px 12px;
       margin: 4px;
       border-radius: 12px;
-      background-color: #3949ab; /* dunkles Blau als Standardfarbe */
+      background-color: #3949ab;
       color: #fff;
       font-size: 0.85rem;
       cursor: pointer;
       user-select: none;
     }
     .chip.active {
-      background-color: #1e3799; /* etwas dunkler für aktive Chips */
+      background-color: #1e3799;
     }
     .chip-container {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
     }
-    /* Verbesserte Darstellung des Aufgabenbereichs in den Tabs */
     #work-list .panel {
       margin-bottom: 12px;
     }
-    /* Kleinere Anpassungen für Buttons im Tab-Bereich */
     .tabs button span {
       font-size: 0.85rem;
     }
-
-    /* Overlay für das Datumsfeld: Das Eingabefeld füllt den Date-Bereich vollständig aus,
-       ist aber unsichtbar und klickbar, damit showPicker() auch auf Mobilgeräten funktioniert. */
     .date-overlay {
       position: absolute;
       top: 0;
@@ -111,14 +105,14 @@
 
   <!-- MAIN APP SCREEN -->
   <div id="app-screen" class="screen hidden">
-    <!-- Topbar mit Datum. Das Datumsauswahlfeld wird über den Anzeigetext gelegt, damit es auch auf Mobilgeräten funktioniert. -->
+    <!-- Topbar mit Datum und Lösch-Button -->
     <div class="topbar">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div class="date-wrapper" style="position:relative; display:inline-block;">
           <div id="date-display" style="font-weight:800; font-size:1.1rem; cursor:pointer;">Datum wählen</div>
-          <!-- Das Eingabefeld liegt unsichtbar über dem Anzeigetext, sodass ein Klick den Datepicker öffnet -->
           <input type="date" id="hidden-date-input" class="date-overlay" />
         </div>
+        <button id="delete-day" class="btn btn-danger" style="margin-left:8px; width:auto;">Tag löschen</button>
       </div>
     </div>
     <div class="content" style="padding-bottom:90px;">
@@ -146,7 +140,6 @@
       <!-- Tab Settings -->
       <div id="tab-settings" class="tab-content settings-content hidden">
         <div class="panel">
-          <!-- Fächer verwalten -->
           <div class="h2">Fächer verwalten</div>
           <p class="muted">Füge Fächer hinzu oder entferne sie.</p>
           <div style="display:flex; gap:8px; margin-bottom:15px;">
@@ -155,12 +148,10 @@
           </div>
           <div id="settings-subject-list" class="chip-container" style="margin-bottom:20px;"></div>
           <hr style="border:0; border-top:1px solid var(--line); margin:20px 0;">
-          <!-- Schultage einstellen -->
           <div class="h2">Schultage einstellen</div>
           <p class="muted">Wähle die Tage mit Berufsschule.</p>
           <div id="settings-schooldays" style="display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-bottom:20px;"></div>
           <hr style="border:0; border-top:1px solid var(--line); margin:20px 0;">
-          <!-- Bereiche verwalten -->
           <div class="h2">Bereiche verwalten</div>
           <p class="muted">Füge neue Arbeitsbereiche hinzu oder lösche Aufgaben.</p>
           <div style="display:flex; gap:8px; margin-bottom:15px;">
@@ -175,7 +166,6 @@
             <button id="settings-add-task" class="btn" style="width:auto">＋</button>
           </div>
           <div id="settings-task-list" style="margin-top:15px;"></div>
-          <!-- Button zum Löschen des aktuell ausgewählten Bereichs -->
           <button id="settings-delete-category" class="btn btn-danger" style="margin-top:10px; width:auto;">Bereich löschen</button>
           <div style="margin-top:40px; padding-top:20px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:12px;">
             <button id="logout-btn" class="btn btn-ghost">Abmelden</button>
@@ -184,7 +174,7 @@
         </div>
       </div>
     </div>
-    <!-- Navigationleiste -->
+    <!-- Navigation -->
     <div class="tabs">
       <button class="tabbtn active" data-tab="day">
         <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a 2 2 0 0 1-2-2z"></path></svg>
@@ -192,16 +182,15 @@
       </button>
       <button class="tabbtn" data-tab="report">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-        <!-- Label des Report‑Tabs auf Deutsch -->
         <span>Bericht</span>
       </button>
       <button class="tabbtn" data-tab="settings">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a 2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a 2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09a1.65 1.65 0 0 0 1.51-1z"></path></svg>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06 .06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a 2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09a1.65 1.65 0 0 0 1.51-1z"></path></svg>
         <span>Settings</span>
       </button>
     </div>
   </div>
-  <!-- Lade zuerst die Supabase-Bibliothek, dann die Umgebungsvariablen und zum Schluss die App-Logik -->
+  <!-- Skripte laden -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./env.js"></script>
   <script src="./app.js"></script>

@@ -83,7 +83,6 @@ html, body {
   outline: none;
   transition: border-color 0.2s;
 }
-
 .input:focus { border-color: var(--acc); }
 
 .btn {
@@ -98,7 +97,6 @@ html, body {
   cursor: pointer;
   transition: opacity 0.2s, transform 0.1s;
 }
-
 .btn:active { transform: scale(0.98); }
 .btn-ghost {
   background: transparent;
@@ -110,7 +108,7 @@ html, body {
   color: white;
 }
 
-/* Tabs Navigation - Nur noch 3 Buttons */
+/* Tabs Navigation */
 .tabs {
   position: fixed;
   bottom: 0;
@@ -125,7 +123,6 @@ html, body {
   padding-bottom: env(safe-area-inset-bottom);
   z-index: 1000;
 }
-
 .tabbtn {
   background: none;
   border: none;
@@ -143,11 +140,9 @@ html, body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-
 .tabbtn.active {
   color: var(--acc);
 }
-
 .tabbtn svg {
   width: 24px;
   height: 24px;
@@ -156,7 +151,6 @@ html, body {
   fill: none;
   transition: transform 0.2s;
 }
-
 .tabbtn.active svg {
   transform: translateY(-2px);
   stroke-width: 3;
@@ -168,7 +162,6 @@ html, body {
   flex-wrap: wrap;
   gap: 8px;
 }
-
 .chip {
   background: var(--card);
   border: 1px solid var(--line);
@@ -179,7 +172,6 @@ html, body {
   cursor: pointer;
   transition: all 0.2s;
 }
-
 .chip.active {
   background: var(--acc);
   color: #000;
@@ -196,14 +188,13 @@ html, body {
   font-weight: 700;
   cursor: pointer;
 }
-
 .weekday.active {
   background: var(--acc);
   color: #000;
   border-color: var(--acc);
 }
 
-/* Print Styles */
+/* Druckansicht (Print Styles) */
 @media print {
   .tabs, .topbar, .btn, .btn-ghost { display: none !important; }
   body { background: white; color: black; }

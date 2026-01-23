@@ -679,3 +679,29 @@ function renderReport() {
   if ($("report-draft-school")) $("report-draft-school").value = sText.trim();
   if ($("report-draft-work")) $("report-draft-work").value = Array.from(wSet).join(", ");
 }
+
+
+// Im DOMContentLoaded-Handler, nach den Report-Buttons:
+if ($("delete-day")) {
+  $("delete-day").onclick = async () => {
+    if (!currentUser) return;
+    const day = state.selectedDate;
+    if (!day) return;
+    // Sicherheitsabfrage: Nutzer muss bestätigen
+    if (!window.confirm("Möchtest du den Eintrag für den ausgewählten Tag löschen?")) return;
+    // Lokale Einträge entfernen
+    const sEntries = getData(KEY.school, {});
+    const wEntries = getData(KEY.work, {});
+    delete sEntries[day];
+    delete wEntries[day];
+    setData(KEY.school, sEntries);
+    setData(KEY.work, wEntries);
+    // Eintrag in der Supabase-Tabelle löschen
+    try {
+      await supabaseClient.from("day_entries").delete().eq("user_id", currentUser.id).eq("day", day);
+    } catch (err) {
+      console.error("Fehler beim Löschen des Tages:", err);
+    }
+    renderAll();
+  };
+}

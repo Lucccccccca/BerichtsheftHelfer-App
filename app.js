@@ -10,8 +10,7 @@
 
 // --- KONFIGURATION ---
 // Die Zugangsdaten für Supabase werden bevorzugt aus einer externen Datei env.js gelesen.
-// In env.js sollte ein Objekt window.env mit den Feldern SUPABASE_URL und SUPABASE_KEY definiert werden.
-// Falls keine Werte vorhanden sind, greifen wir auf LocalStorage zurück oder verwenden einen Platzhalter.
+// Falls keine Werte vorhanden sind, greifen wir auf localStorage zurück oder verwenden einen Platzhalter.
 const SUPABASE_URL = (typeof window !== "undefined" && window.env && window.env.SUPABASE_URL) || "https://epeqhchtatxgninetvid.supabase.co";
 const SUPABASE_KEY = (typeof window !== "undefined" && window.env && window.env.SUPABASE_KEY) || localStorage.getItem("supabaseKey") || "<Schlüssel hier>";
 
@@ -136,23 +135,11 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.onclick = () => switchTab(btn.dataset.tab);
   });
 
-  // Date Picker: Funktioniert dank Fallback auch auf Mobilgeräten
-  const dateDisplay = $("date-display");
+  // Date Picker – das Eingabefeld liegt unsichtbar über dem Datumstext.
+  // Auf Mobilgeräten öffnet das Overlay den Picker automatisch; hier reagieren
+  // wir nur auf die Änderung des Datums.
   const dateInput = $("hidden-date-input");
-  if (dateDisplay && dateInput) {
-    dateDisplay.onclick = () => {
-      try {
-        if (typeof dateInput.showPicker === "function") {
-          dateInput.showPicker();
-        } else {
-          dateInput.focus();
-          dateInput.click();
-        }
-      } catch (e) {
-        dateInput.focus();
-        dateInput.click();
-      }
-    };
+  if (dateInput) {
     dateInput.onchange = (e) => {
       state.selectedDate = e.target.value;
       renderAll();
@@ -160,75 +147,150 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // Setup Workflow ...
-  // (siehe kompletten Code für alle Setup-Button-Handler, Logout/Reset, Einstellungen)
-});
-// --- CLOUD SYNC ---
-async function saveEntry() {
-  if (!currentUser || !supabaseClient) return;
-  const day = state.selectedDate;
-  try {
-    await supabaseClient.from("day_entries").upsert({
-      user_id: currentUser.id,
-      day: day,
-      school: getData(KEY.school, {})[day] || {},
-      work: getData(KEY.work, {})[day] || { tasks: [], note: "" }
-    }, { onConflict: 'user_id, day' });
-  } catch (e) {
-    console.error("SaveEntry Error:", e);
-  }
-}
+  // Setup Workflow
+  if ($("setup-to-step-2")) $("setup-to-step-2").onclick = () => { hide($("setup-step-1")); show($("setup-step-2")); };
+  if ($("setup-to-step-3")) $("setup-to-step-3").onclick = () => { hide($("setup-step-2")); show($("setup-step-3")); };
 
-async function saveConfig() {
-  if (!currentUser || !supabaseClient) return;
-  try {
-    // Die Supabase-Tabelle user_config verwendet nur die Spalten school_days und work_templates.
-    // Wir senden ausschließlich diese Spalten, um 400‑Fehler durch unbekannte Felder zu vermeiden.
-    await supabaseClient.from("user_config").upsert({
-      user_id: currentUser.id,
-      subjects: getData(KEY.subjects, []),
-      school_days: getData(KEY.days, [1, 2]),
-      work_templates: getData(KEY.workTemplates, {})
-    }, { onConflict: 'user_id' });
-  } catch (e) {
-    console.error("SaveConfig Error:", e);
-  }
-}
-
-async function syncDown() {
-  if (!currentUser || !supabaseClient) return;
-  try {
-    const [entriesRes, configRes] = await Promise.all([
-      supabaseClient.from("day_entries").select("*").eq("user_id", currentUser.id),
-      supabaseClient.from("user_config").select("*").eq("user_id", currentUser.id)
-    ]);
-    if (entriesRes.data && entriesRes.data.length > 0) {
-      const s = {}; const w = {};
-      entriesRes.data.forEach(e => { s[e.day] = e.school; w[e.day] = e.work; });
-      setData(KEY.school, s);
-      setData(KEY.work, w);
-    }
-    if (configRes.data && configRes.data.length > 0) {
-      const c = configRes.data[0];
-      const schoolDaysVal = c.school_days ? c.school_days : (c.schooldays ? c.schooldays : [1, 2]);
-      const templatesVal = c.work_templates ? c.work_templates : (c.templates ? c.templates : {});
-      setData(KEY.subjects, c.subjects || []);
-      setData(KEY.days, schoolDaysVal);
-      setData(KEY.workTemplates, templatesVal);
-      setData(KEY.setup, true);
-    } else {
-      if (localStorage.getItem(KEY.setup) === null) {
-        setData(KEY.setup, false);
+  if ($("setup-add-subject")) {
+    $("setup-add-subject").onclick = () => {
+      const v = $("setup-subject-input").value.trim();
+      if (v) {
+        const s = getData(KEY.subjects, []);
+        s.push(v);
+        setData(KEY.subjects, s);
+        $("setup-subject-input").value = "";
+        renderSetup();
       }
-    }
-  } catch (e) {
-    console.error("SyncDown Fehler:", e);
+    };
   }
-}
+  if ($("setup-add-category")) {
+    $("setup-add-category").onclick = () => {
+      const v = $("setup-category-input").value.trim();
+      if (v) {
+        const temps = getData(KEY.workTemplates, {});
+        if (!temps[v]) temps[v] = [];
+        setData(KEY.workTemplates, temps);
+        $("setup-category-input").value = "";
+        renderSetup();
+      }
+    };
+  }
+  if ($("setup-add-task")) {
+    $("setup-add-task").onclick = () => {
+      const cat = $("setup-category-select").value;
+      const v = $("setup-task-input").value.trim();
+      if (cat && v) {
+        const temps = getData(KEY.workTemplates, {});
+        if (!temps[cat]) temps[cat] = [];
+        temps[cat].push(v);
+        setData(KEY.workTemplates, temps);
+        $("setup-task-input").value = "";
+        renderSetup();
+      }
+    };
+  }
+  if ($("setup-finish")) {
+    $("setup-finish").onclick = async () => {
+      setData(KEY.setup, true);
+      await saveConfig();
+      location.reload();
+    };
+  }
 
-// --- RENDERING (Schule, Arbeit, Setup, Settings, Report) ---
-// (siehe kompletten Code oben – enthält renderSchool(), renderWork(), renderSetup(),
-// renderSettingsCategories(), renderSettingsTasks(), renderReport() usw.)
+  // Logout und Reset
+  if ($("logout-btn")) {
+    $("logout-btn").onclick = async () => {
+      // Abmelden: Auth-Session entfernen, aber nicht unsere Supabase-Key im localStorage löschen.
+      await supabaseClient.auth.signOut();
+      // Lösche nur app-spezifische Daten
+      Object.values(KEY).forEach(k => localStorage.removeItem(k));
+      // Optional: entferne den Supabase-Key, wenn du beim nächsten Start wieder gefragt werden möchtest.
+      // localStorage.removeItem('supabaseKey');
+      location.reload();
+    };
+  }
+  if ($("reset-all")) {
+    $("reset-all").onclick = () => {
+      // Lokale Daten für die App löschen, aber den Supabase-Session-Token nicht löschen,
+      // damit der Benutzer angemeldet bleibt.
+      Object.values(KEY).forEach(k => localStorage.removeItem(k));
+      // Supabase-Key und Supabase-Session bleiben erhalten.
+      location.reload();
+    };
+  }
+
+  // Einstellungen: Hinzufügen, Löschen und Auswahl
+  if ($("settings-add-subject")) {
+    $("settings-add-subject").onclick = () => {
+      const val = $("settings-subject-input").value.trim();
+      if (val) {
+        const arr = getData(KEY.subjects, []);
+        arr.push(val);
+        setData(KEY.subjects, arr);
+        $("settings-subject-input").value = "";
+        renderSettingsSubjects();
+        renderSchool();
+        saveConfig();
+      }
+    };
+  }
+  if ($("settings-add-category")) {
+    $("settings-add-category").onclick = () => {
+      const val = $("settings-category-input").value.trim();
+      if (val) {
+        const temps = getData(KEY.workTemplates, {});
+        if (!temps[val]) temps[val] = [];
+        setData(KEY.workTemplates, temps);
+        $("settings-category-input").value = "";
+        // Nach dem Hinzufügen eines neuen Bereichs diesen direkt auswählen
+        renderSettingsCategories(val);
+        renderWork();
+        saveConfig();
+      }
+    };
+  }
+  if ($("settings-add-task")) {
+    $("settings-add-task").onclick = () => {
+      const catSel = $("settings-category-select");
+      const val = $("settings-task-input").value.trim();
+      const cat = catSel?.value;
+      if (cat && val) {
+        const temps = getData(KEY.workTemplates, {});
+        if (!temps[cat]) temps[cat] = [];
+        temps[cat].push(val);
+        setData(KEY.workTemplates, temps);
+        $("settings-task-input").value = "";
+        // Nach dem Hinzufügen einer neuen Aufgabe die aktuelle Kategorie beibehalten
+        // und nur die Aufgabenliste neu rendern
+        renderSettingsTasks(cat);
+        renderWork();
+        saveConfig();
+      }
+    };
+  }
+
+  // Navigationsbuttons im Report
+  if ($("report-prev")) $("report-prev").onclick = () => { state.weekOff--; renderReport(); };
+  if ($("report-next")) $("report-next").onclick = () => { state.weekOff++; renderReport(); };
+
+  // Bereich löschen (Settings)
+  if ($("settings-delete-category")) {
+    $("settings-delete-category").onclick = () => {
+      const catSel = $("settings-category-select");
+      const cat = catSel?.value;
+      if (cat) {
+        const temps = getData(KEY.workTemplates, {});
+        delete temps[cat];
+        setData(KEY.workTemplates, temps);
+        if ($("settings-task-input")) $("settings-task-input").value = "";
+        renderSettingsCategories();
+        renderWork();
+        saveConfig();
+      }
+    };
+  }
+});
+
 // --- CLOUD SYNC ---
 async function saveEntry() {
   if (!currentUser || !supabaseClient) return;
@@ -383,9 +445,7 @@ function renderWork() {
       chip.className = "chip" + (dayData.tasks.includes(t) ? " active" : "");
       chip.textContent = t;
       chip.onclick = () => {
-        dayData.tasks = dayData.tasks.includes(t)
-          ? dayData.tasks.filter(x => x !== t)
-          : [...dayData.tasks, t];
+        dayData.tasks = dayData.tasks.includes(t) ? dayData.tasks.filter(x => x !== t) : [...dayData.tasks, t];
         entries[state.selectedDate] = dayData;
         setData(KEY.work, entries);
         renderWork();
@@ -407,6 +467,7 @@ function renderWork() {
   list.appendChild(notePanel);
 }
 
+// Setup-Rendering (Fächer, Schultage, Arbeitsbereiche)
 function renderSetup() {
   // Schritt 1: Fächer
   const list = $("setup-subject-list");
@@ -425,7 +486,6 @@ function renderSetup() {
       list.appendChild(c);
     });
   }
-
   // Schritt 2: Schultage
   const grid = $("setup-schooldays");
   if (grid) {
@@ -445,7 +505,6 @@ function renderSetup() {
       grid.appendChild(b);
     });
   }
-
   // Schritt 3: Arbeitsbereiche
   const catSelect = $("setup-category-select");
   if (catSelect) {
@@ -462,7 +521,6 @@ function renderSetup() {
       renderSetup();
     };
   }
-
   const taskList = $("setup-task-list");
   if (taskList && catSelect) {
     taskList.innerHTML = "";
@@ -484,6 +542,7 @@ function renderSetup() {
   }
 }
 
+// Einstellungs-Tab: Fächer, Schultage, Kategorien und Aufgaben
 function renderSettings() {
   renderSettingsSubjects();
   renderSettingsSchoolDays();
@@ -544,7 +603,7 @@ function renderSettingsCategories(selectedCat) {
   const temps = getData(KEY.workTemplates, {});
   const categories = Object.keys(temps);
 
-  // Dropdown neu befüllen
+  // Fülle das Dropdown neu
   select.innerHTML = "";
   categories.forEach(c => {
     const opt = document.createElement("option");
@@ -553,21 +612,21 @@ function renderSettingsCategories(selectedCat) {
     select.appendChild(opt);
   });
 
-  // Gewünschte Kategorie auswählen
+  // Wähle die gewünschte Kategorie aus oder setze auf die erste
   if (selectedCat && categories.includes(selectedCat)) {
     select.value = selectedCat;
   } else if (select.value && categories.includes(select.value)) {
-    // nichts ändern
+    // nothing to change
   } else if (categories.length > 0) {
     select.value = categories[0];
   }
 
-  // Aufgaben neu rendern, wenn Kategorie geändert wird
+  // Bei Änderung der Kategorie nur die Aufgaben neu rendern
   select.onchange = () => {
     renderSettingsTasks(select.value);
   };
 
-  // Aufgaben der aktuellen Kategorie rendern
+  // Rendere die Aufgaben der aktuellen Kategorie
   renderSettingsTasks(select.value);
 }
 
@@ -585,6 +644,8 @@ function renderSettingsTasks(cat) {
     chip.className = "chip active";
     chip.textContent = task;
     chip.onclick = () => {
+      // Kategorie zwischenspeichern, damit sie nach dem Löschen der Aufgabe
+      // weiterhin ausgewählt bleibt
       const currentCat = cat;
       temps[currentCat] = temps[currentCat].filter(x => x !== task);
       setData(KEY.workTemplates, temps);
@@ -610,7 +671,7 @@ function renderReport() {
     const iso = cur.toISOString().split("T")[0];
     if (sE[iso]) {
       Object.entries(sE[iso]).forEach(([k, v]) => {
-        if (v) sText += k + ": " + v + "\n";
+        if (v) sText += k + ": " + v + "\\n";
       });
     }
     if (wE[iso]?.tasks) wE[iso].tasks.forEach(t => wSet.add(t));
